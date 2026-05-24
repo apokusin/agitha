@@ -385,4 +385,232 @@ describe("PromptBuilder custom personalities", () => {
 		expect(result?.customPersonality?.key).toBe("reviewer");
 		expect(spyLogger.warn).not.toHaveBeenCalled();
 	});
+
+	describe("requireAllLabels", () => {
+		it("matches only when every personality label is on the issue", async () => {
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					"draft-article": {
+						labels: ["Article", "Draft"],
+						promptPath: reviewerPromptPath,
+						requireAllLabels: true,
+					},
+				},
+			});
+			const builder = makeBuilder([repo]);
+
+			const matched = await builder.determineSystemPromptFromLabels(
+				["Article", "Draft"],
+				[repo],
+			);
+			expect(matched?.customPersonality?.key).toBe("draft-article");
+		});
+
+		it("does NOT match when only some labels are present", async () => {
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					"draft-article": {
+						labels: ["Article", "Draft"],
+						promptPath: reviewerPromptPath,
+						requireAllLabels: true,
+					},
+				},
+			});
+			const builder = makeBuilder([repo]);
+
+			const result = await builder.determineSystemPromptFromLabels(
+				["Article"],
+				[repo],
+			);
+			expect(result).toBeUndefined();
+		});
+
+		it("requireAllLabels=false (default) keeps any-label matching", async () => {
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					"draft-article": {
+						labels: ["Article", "Draft"],
+						promptPath: reviewerPromptPath,
+					},
+				},
+			});
+			const builder = makeBuilder([repo]);
+
+			const result = await builder.determineSystemPromptFromLabels(
+				["Article"],
+				[repo],
+			);
+			expect(result?.customPersonality?.key).toBe("draft-article");
+		});
+	});
+
+	describe("referenceDirs", () => {
+		it("appends a <reference_context> block listing each dir to the prompt", async () => {
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					"copy-writer": {
+						labels: ["Article"],
+						promptPath: reviewerPromptPath,
+						referenceDirs: ["./content/voice", "./content/posts"],
+					},
+				},
+			});
+			const builder = makeBuilder([repo]);
+
+			const result = await builder.determineSystemPromptFromLabels(
+				["Article"],
+				[repo],
+			);
+
+			expect(result?.prompt).toContain("<reference_context>");
+			expect(result?.prompt).toContain("- ./content/voice");
+			expect(result?.prompt).toContain("- ./content/posts");
+			expect(result?.prompt).toContain("</reference_context>");
+		});
+
+		it("omits the block when referenceDirs is undefined or empty", async () => {
+			const repoNone = makeRepo("repo-a", {
+				customPersonalities: {
+					reviewer: {
+						labels: ["Article"],
+						promptPath: reviewerPromptPath,
+					},
+				},
+			});
+			const repoEmpty = makeRepo("repo-b", {
+				customPersonalities: {
+					reviewer: {
+						labels: ["Article"],
+						promptPath: reviewerPromptPath,
+						referenceDirs: [],
+					},
+				},
+			});
+
+			const noneResult = await makeBuilder([
+				repoNone,
+			]).determineSystemPromptFromLabels(["Article"], [repoNone]);
+			const emptyResult = await makeBuilder([
+				repoEmpty,
+			]).determineSystemPromptFromLabels(["Article"], [repoEmpty]);
+
+			expect(noneResult?.prompt).not.toContain("<reference_context>");
+			expect(emptyResult?.prompt).not.toContain("<reference_context>");
+		});
+	});
+
+	describe("[personality=...] description tag", () => {
+		it("invokes the named personality regardless of labels", async () => {
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					"copy-writer": {
+						labels: ["Article"],
+						promptPath: auditorPromptPath,
+					},
+				},
+			});
+			const builder = makeBuilder([repo]);
+
+			const result = await builder.determineSystemPromptFromLabels(
+				[], // no labels
+				[repo],
+				"Some draft brief — [personality=copy-writer]",
+			);
+
+			expect(result?.customPersonality?.key).toBe("copy-writer");
+			expect(result?.customPersonality?.source).toBe("repository");
+		});
+
+		it("overrides label matching when both would resolve to different personalities", async () => {
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					reviewer: {
+						labels: ["Code Review"],
+						promptPath: reviewerPromptPath,
+					},
+					"copy-writer": {
+						labels: ["Article"],
+						promptPath: auditorPromptPath,
+					},
+				},
+			});
+			const builder = makeBuilder([repo]);
+
+			const result = await builder.determineSystemPromptFromLabels(
+				["Code Review"],
+				[repo],
+				"[personality=copy-writer]",
+			);
+
+			expect(result?.customPersonality?.key).toBe("copy-writer");
+		});
+
+		it("falls back to label matching when the tag points to a non-existent personality (and warns)", async () => {
+			const spyLogger = makeSpyLogger();
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					reviewer: {
+						labels: ["Code Review"],
+						promptPath: reviewerPromptPath,
+					},
+				},
+			});
+			const builder = new PromptBuilder({
+				logger: spyLogger,
+				repositories: new Map([[repo.id, repo]]),
+				issueTrackers: new Map<string, IIssueTrackerService>(),
+				gitService: stubGitService,
+			});
+
+			const result = await builder.determineSystemPromptFromLabels(
+				["Code Review"],
+				[repo],
+				"[personality=does-not-exist]",
+			);
+
+			expect(result?.customPersonality?.key).toBe("reviewer");
+			expect(spyLogger.warn).toHaveBeenCalledWith(
+				expect.stringContaining("does-not-exist"),
+			);
+		});
+
+		it("looks up workspace-wide personalities by name", async () => {
+			const repo = makeRepo("repo-a");
+			const builder = makeBuilder([repo], {
+				"copy-writer": {
+					labels: ["Article"],
+					promptPath: auditorPromptPath,
+				},
+			});
+
+			const result = await builder.determineSystemPromptFromLabels(
+				[],
+				[repo],
+				"Brief: [personality=copy-writer]",
+			);
+
+			expect(result?.customPersonality?.key).toBe("copy-writer");
+			expect(result?.customPersonality?.source).toBe("workspace");
+		});
+
+		it("ignores the tag when no description is provided", async () => {
+			const repo = makeRepo("repo-a", {
+				customPersonalities: {
+					reviewer: {
+						labels: ["Code Review"],
+						promptPath: reviewerPromptPath,
+					},
+				},
+			});
+			const builder = makeBuilder([repo]);
+
+			const result = await builder.determineSystemPromptFromLabels(
+				["Code Review"],
+				[repo],
+				undefined,
+			);
+
+			expect(result?.customPersonality?.key).toBe("reviewer");
+		});
+	});
 });

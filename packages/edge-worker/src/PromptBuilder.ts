@@ -118,12 +118,25 @@ export class PromptBuilder {
 	async determineSystemPromptFromLabels(
 		labels: string[],
 		repositories: RepositoryConfig[],
+		issueDescription?: string,
 	): Promise<SystemPromptResult | undefined> {
+		const lowercaseLabels = labels.map((label) => label.toLowerCase());
+
+		// PRIORITY 0: Explicit `[personality=<key>]` description tag wins over
+		// label matching entirely — operators (or non-technical authors) can
+		// invoke a personality without changing Linear labels.
+		const tagMatch = await this.matchCustomPersonalityFromDescriptionTag(
+			issueDescription,
+			labels,
+			repositories,
+		);
+		if (tagMatch) {
+			return tagMatch;
+		}
+
 		if (labels.length === 0) {
 			return undefined;
 		}
-
-		const lowercaseLabels = labels.map((label) => label.toLowerCase());
 
 		// PRIORITY 1: User-defined custom personalities (per-repo, then workspace).
 		// These intentionally run before the built-in matchers so users can shadow
@@ -263,10 +276,10 @@ export class PromptBuilder {
 
 			for (const [key, config] of Object.entries(personalities)) {
 				perRepoKeys.add(key);
-				const matchingLabels = this.findMatchingLabels(
+				const matchingLabels = this.matchPersonalityLabels(
 					lowercaseLabels,
 					labels,
-					config.labels,
+					config,
 				);
 				if (matchingLabels.length > 0) {
 					candidates.push({
@@ -283,10 +296,10 @@ export class PromptBuilder {
 		const workspacePersonalities = this.getWorkspaceCustomPersonalities?.();
 		if (workspacePersonalities) {
 			for (const [key, config] of Object.entries(workspacePersonalities)) {
-				const matchingLabels = this.findMatchingLabels(
+				const matchingLabels = this.matchPersonalityLabels(
 					lowercaseLabels,
 					labels,
-					config.labels,
+					config,
 				);
 				if (matchingLabels.length > 0) {
 					candidates.push({
@@ -389,6 +402,108 @@ export class PromptBuilder {
 	}
 
 	/**
+	 * Like `findMatchingLabels` but honors the personality's `requireAllLabels`
+	 * flag. Returns an empty array (= no match) when the flag is set and the
+	 * issue is missing any of the personality's configured labels.
+	 */
+	private matchPersonalityLabels(
+		lowercaseIssueLabels: string[],
+		issueLabels: string[],
+		personality: CustomPersonalityConfig,
+	): string[] {
+		const matched = this.findMatchingLabels(
+			lowercaseIssueLabels,
+			issueLabels,
+			personality.labels,
+		);
+		if (matched.length === 0) {
+			return matched;
+		}
+		if (
+			personality.requireAllLabels &&
+			matched.length < personality.labels.length
+		) {
+			return [];
+		}
+		return matched;
+	}
+
+	/**
+	 * Match a custom personality named explicitly in the issue description
+	 * via a `[personality=<key>]` tag. The tag takes precedence over label
+	 * matching, lets non-technical authors opt in without managing Linear
+	 * labels, and respects per-repo-over-workspace key precedence (same
+	 * resolution order as `matchCustomPersonality`).
+	 *
+	 * Returns `undefined` when there's no description, no tag, the named
+	 * personality is not configured, or its prompt file fails to load.
+	 */
+	private async matchCustomPersonalityFromDescriptionTag(
+		issueDescription: string | undefined,
+		issueLabels: string[],
+		repositories: RepositoryConfig[],
+	): Promise<SystemPromptResult | undefined> {
+		if (!issueDescription) return undefined;
+
+		const requestedKey = this.parsePersonalityTag(issueDescription);
+		if (!requestedKey) return undefined;
+
+		for (const repository of repositories) {
+			const config = repository.customPersonalities?.[requestedKey];
+			if (config) {
+				const loaded = await this.loadCustomPersonalityPrompt(
+					requestedKey,
+					config,
+					issueLabels,
+					"repository",
+					repository.id,
+				);
+				if (loaded) {
+					this.logger.debug(
+						`Custom personality '${requestedKey}' invoked via [personality=...] description tag (repository:${repository.id})`,
+					);
+					return loaded;
+				}
+			}
+		}
+
+		const workspacePersonalities = this.getWorkspaceCustomPersonalities?.();
+		const workspaceConfig = workspacePersonalities?.[requestedKey];
+		if (workspaceConfig) {
+			const loaded = await this.loadCustomPersonalityPrompt(
+				requestedKey,
+				workspaceConfig,
+				issueLabels,
+				"workspace",
+			);
+			if (loaded) {
+				this.logger.debug(
+					`Custom personality '${requestedKey}' invoked via [personality=...] description tag (workspace)`,
+				);
+				return loaded;
+			}
+		}
+
+		this.logger.warn(
+			`Issue description requested '[personality=${requestedKey}]' but no matching personality is configured`,
+		);
+		return undefined;
+	}
+
+	/**
+	 * Extract the `[personality=<key>]` value from an issue description, if
+	 * present. Mirrors `RunnerSelectionService.parseDescriptionTag`'s tolerant
+	 * matching (escaped brackets, case-insensitive). Kept inline here to
+	 * avoid a circular dep between PromptBuilder and RunnerSelectionService.
+	 */
+	private parsePersonalityTag(description: string): string | undefined {
+		const match = description.match(
+			/\\?\[personality=([a-zA-Z0-9_.:/-]+)\\?\]/i,
+		);
+		return match?.[1];
+	}
+
+	/**
 	 * Load the markdown file for a custom personality and build the result.
 	 * Returns `undefined` (and logs) if the file cannot be read; callers
 	 * should fall through to the next personality / built-in matcher.
@@ -401,8 +516,12 @@ export class PromptBuilder {
 		repositoryId?: string,
 	): Promise<SystemPromptResult | undefined> {
 		try {
-			const promptContent = await readFile(config.promptPath, "utf-8");
-			const version = this.extractVersionTag(promptContent);
+			const rawPrompt = await readFile(config.promptPath, "utf-8");
+			const version = this.extractVersionTag(rawPrompt);
+			const prompt = this.appendReferenceContext(
+				rawPrompt,
+				config.referenceDirs,
+			);
 
 			this.logger.debug(
 				`Using custom personality '${key}' (${source}${
@@ -416,7 +535,7 @@ export class PromptBuilder {
 			}
 
 			return {
-				prompt: promptContent,
+				prompt,
 				version,
 				customPersonality: {
 					key,
@@ -432,6 +551,34 @@ export class PromptBuilder {
 			);
 			return undefined;
 		}
+	}
+
+	/**
+	 * Append a `<reference_context>` block listing the personality's
+	 * `referenceDirs` to the loaded prompt content. The block instructs the
+	 * agent to consult those paths for style and prior-work context before
+	 * producing new work.
+	 *
+	 * No-op when `referenceDirs` is unset or empty.
+	 */
+	private appendReferenceContext(
+		prompt: string,
+		referenceDirs: string[] | undefined,
+	): string {
+		if (!referenceDirs || referenceDirs.length === 0) {
+			return prompt;
+		}
+		const dirList = referenceDirs.map((dir) => `- ${dir}`).join("\n");
+		const block = `
+
+<reference_context>
+The following workspace-relative directories contain reference material you should consult for voice, style, and prior context before producing new work:
+
+${dirList}
+
+Use Glob, Grep, and Read to explore them. Treat them as authoritative examples of the expected tone, structure, and conventions.
+</reference_context>`;
+		return prompt + block;
 	}
 
 	/**

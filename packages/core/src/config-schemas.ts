@@ -140,6 +140,24 @@ const PromptTypeDefaultsSchema = z.object({
 const CustomPersonalityConfigSchema = z.object({
 	labels: z.array(z.string()),
 	promptPath: z.string(),
+	/**
+	 * When true, the personality matches only when *every* label in `labels`
+	 * is present on the issue (case-insensitive). Default false — any single
+	 * label match is enough. Use this to require label combinations like
+	 * `["Article", "Draft"]` without the personality firing for every
+	 * "Article" issue.
+	 */
+	requireAllLabels: z.boolean().optional(),
+	/**
+	 * Workspace-relative directories the personality should consult for
+	 * style, voice, and historical examples (a static "memory" surface). At
+	 * session start, the listed paths are injected into the personality's
+	 * system prompt as a `<reference_context>` block instructing the agent
+	 * to read them before producing work. The directories themselves still
+	 * need to be readable through the personality's `allowedTools` (e.g.
+	 * `Read` / `Glob` / `Grep` for a read-only or copy-writer personality).
+	 */
+	referenceDirs: z.array(z.string()).optional(),
 	allowedTools: ToolRestrictionSchema.optional(),
 	disallowedTools: z.array(z.string()).optional(),
 	/**

@@ -154,6 +154,8 @@ Can be configured at the workspace level (top-level `customPersonalities` in `co
 
 - **`labels`** (array of strings, required) — Linear label names that trigger this personality. Matching is case-insensitive.
 - **`promptPath`** (string, required) — Path to the system-prompt markdown file. Supports `~/` expansion (resolved against the user's home directory) and is resolved at config load time.
+- **`requireAllLabels`** (boolean, optional) — When true, the personality matches only when *every* label in `labels` is present on the issue. Default false (any single label match is enough). Use this for label combinations like `["Article", "Draft"]` that should not fire on every "Article" issue.
+- **`referenceDirs`** (array of strings, optional) — Workspace-relative directories the personality should treat as reference material (style guides, past work, voice examples). At session start these are listed in a `<reference_context>` block appended to the personality's system prompt, with an instruction to `Glob` / `Read` / `Grep` them for context. The directories still need to be reachable through the personality's `allowedTools`.
 - **`allowedTools`** (string or array, optional) — Tool list or preset (`"readOnly"`, `"safe"`, `"all"`, `"coordinator"`). When set, fully replaces the resolved tool list — the personality owns its tool surface.
 - **`disallowedTools`** (array of strings, optional) — Tools to explicitly deny. When set, fully replaces any per-repository / global disallow list.
 - **`writeScopes`** (array of strings, optional) — Workspace-relative glob patterns (e.g. `["./content/**"]`) that scope any unscoped `"Write"` or `"Edit"` entry in `allowedTools`. Already-parenthesized entries (e.g. `"Write(./other/**)"`) pass through unchanged. Has no effect when `allowedTools` is unset.
@@ -222,6 +224,16 @@ By default, granting a personality `"Write"` (or `"Edit"`) in `allowedTools` let
 ```
 
 At session start the bare `"Write"` is expanded into `"Write(./content/**)"`, so the final allow-list passed to the runner is `["Read", "Glob", "Grep", "WebFetch", "Write(./content/**)"]`. List multiple patterns to allow writes in several directories (e.g. `["./content/**", "./drafts/**"]` produces one `Write(<scope>)` entry per scope). Entries that are already parenthesized — for example `"Write(./other/**)"` — pass through verbatim and are not duplicated per scope.
+
+### Invoking a personality from the issue description
+
+Linear authors who don't want to manage labels — or who want to pick a personality ad-hoc — can name one directly in the issue description with a `[personality=<key>]` tag:
+
+```
+Draft a 600-word piece on edge networking. [personality=copy-writer]
+```
+
+The tag takes precedence over label matching: if `copy-writer` is configured anywhere (per-repo first, then workspace), it wins regardless of what labels are on the issue. If the tag names a personality that isn't configured, the matcher falls back to label-based matching and logs a warning. The tag syntax matches the existing `[agent=...]` / `[model=...]` description tags — escaped brackets and case-insensitive keys are both accepted.
 
 ---
 

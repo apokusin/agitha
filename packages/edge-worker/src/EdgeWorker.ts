@@ -4405,6 +4405,7 @@ ${taskSection}`;
 				const systemPromptResult = await this.determineSystemPromptFromLabels(
 					labels,
 					primaryRepo,
+					fullIssue.description || undefined,
 				);
 				systemPromptVersion = systemPromptResult?.version;
 				promptType = systemPromptResult?.type;
@@ -5229,15 +5230,21 @@ ${taskSection}`;
 	}
 
 	/**
-	 * Determine system prompt based on issue labels and repository configuration
+	 * Determine system prompt based on issue labels and repository configuration.
+	 *
+	 * Pass `issueDescription` to also honor `[personality=<key>]` description
+	 * tags — those take precedence over label matching when present.
 	 */
 	private async determineSystemPromptFromLabels(
 		labels: string[],
 		repository: RepositoryConfig,
+		issueDescription?: string,
 	): Promise<SystemPromptResult | undefined> {
-		return this.promptBuilder.determineSystemPromptFromLabels(labels, [
-			repository,
-		]);
+		return this.promptBuilder.determineSystemPromptFromLabels(
+			labels,
+			[repository],
+			issueDescription,
+		);
 	}
 
 	/**
@@ -6031,6 +6038,7 @@ ${taskSection}`;
 			const result = await this.promptBuilder.determineSystemPromptFromLabels(
 				input.labels || [],
 				repositories,
+				input.fullIssue.description || undefined,
 			);
 			labelBasedSystemPrompt = result?.prompt;
 		}
@@ -7068,6 +7076,7 @@ ${input.userComment}
 		const systemPromptResult = await this.determineSystemPromptFromLabels(
 			labels,
 			repository,
+			fullIssue.description || undefined,
 		);
 		const systemPrompt = systemPromptResult?.prompt;
 		const promptType = systemPromptResult?.type;

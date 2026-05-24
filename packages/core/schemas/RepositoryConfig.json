@@ -415,6 +415,15 @@
 					"promptPath": {
 						"type": "string"
 					},
+					"requireAllLabels": {
+						"type": "boolean"
+					},
+					"referenceDirs": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
 					"allowedTools": {
 						"anyOf": [
 							{
