@@ -153,7 +153,11 @@ import { EgressProxy } from "./EgressProxy.js";
 import { GitService } from "./GitService.js";
 import { GlobalSessionRegistry } from "./GlobalSessionRegistry.js";
 import { McpConfigService } from "./McpConfigService.js";
-import { PromptBuilder, type SystemPromptResult } from "./PromptBuilder.js";
+import {
+	type CustomPersonalityMatch,
+	PromptBuilder,
+	type SystemPromptResult,
+} from "./PromptBuilder.js";
 import type {
 	IssueContextResult,
 	PromptAssembly,
@@ -4413,6 +4417,7 @@ ${taskSection}`;
 						labels,
 						linearWorkspaceId,
 						primaryRepo.id,
+						systemPromptResult?.customPersonality,
 					);
 				}
 			}
@@ -6963,12 +6968,14 @@ ${input.userComment}
 		labels: string[],
 		linearWorkspaceId: string,
 		repositoryId: string,
+		customPersonality?: CustomPersonalityMatch,
 	): Promise<void> {
 		return this.activityPoster.postSystemPromptSelectionThought(
 			sessionId,
 			labels,
 			linearWorkspaceId,
 			repositoryId,
+			customPersonality,
 		);
 	}
 
