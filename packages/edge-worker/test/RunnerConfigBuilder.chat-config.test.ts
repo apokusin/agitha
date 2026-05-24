@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { ILogger } from "cyrus-core";
+import type { ILogger } from "agitha-core";
 import { describe, expect, it } from "vitest";
 import {
 	type IChatToolResolver,
@@ -38,8 +38,8 @@ function makeBuilder(): RunnerConfigBuilder {
 describe("RunnerConfigBuilder.buildChatConfig", () => {
 	it("includes autoMemoryDirectory in allowedDirectories so the session can read existing memory files (CYPACK-1197)", () => {
 		const builder = makeBuilder();
-		const cyrusHome = "/tmp/cyrus-home-test";
-		const workspacePath = join(cyrusHome, "slack-workspaces", "thread-x");
+		const agithaHome = "/tmp/agitha-home-test";
+		const workspacePath = join(agithaHome, "slack-workspaces", "thread-x");
 		const repositoryPaths = ["/repo/one", "/repo/two"];
 
 		const config = builder.buildChatConfig({
@@ -47,7 +47,7 @@ describe("RunnerConfigBuilder.buildChatConfig", () => {
 			workspaceName: "slack-thread-x",
 			systemPrompt: "test",
 			sessionId: "sess-1",
-			cyrusHome,
+			agithaHome,
 			platformName: "slack",
 			repositoryPaths,
 			logger: silentLogger,
@@ -55,7 +55,7 @@ describe("RunnerConfigBuilder.buildChatConfig", () => {
 			onError: () => {},
 		});
 
-		const expectedAutoMemoryDir = join(cyrusHome, "slack-memory");
+		const expectedAutoMemoryDir = join(agithaHome, "slack-memory");
 		expect(config.autoMemoryDirectory).toBe(expectedAutoMemoryDir);
 		expect(config.allowedDirectories).toEqual([
 			workspacePath,

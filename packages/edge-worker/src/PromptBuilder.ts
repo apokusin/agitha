@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import {
 	type BaseBranchResolution,
 	type Comment,
+	type CustomPersonalities,
+	type CustomPersonalityConfig,
 	type GuidanceRule,
 	type IIssueTrackerService,
 	type ILogger,
@@ -13,7 +15,7 @@ import {
 	requireLinearWorkspaceId,
 	type WebhookAgentSession,
 	type WebhookComment,
-} from "cyrus-core";
+} from "agitha-core";
 import type { GitService } from "./GitService.js";
 
 /**
@@ -24,6 +26,26 @@ export interface PromptBuilderDeps {
 	repositories: Map<string, RepositoryConfig>;
 	issueTrackers: Map<string, IIssueTrackerService>;
 	gitService: GitService;
+	/**
+	 * Returns workspace-wide custom personalities from the live config.
+	 * Called lazily on each match attempt so hot-reloaded config is picked up.
+	 */
+	getWorkspaceCustomPersonalities?: () => CustomPersonalities | undefined;
+}
+
+/**
+ * A custom personality match — returned inline on `SystemPromptResult`
+ * when a user-defined personality wins over the built-in matchers.
+ */
+export interface CustomPersonalityMatch {
+	/** Personality key (the map key under `customPersonalities`) */
+	key: string;
+	/** Source of the match (per-repo vs workspace-wide), useful for logs */
+	source: "repository" | "workspace";
+	/** Repository the match was anchored to (when source is "repository") */
+	repositoryId?: string;
+	/** The personality config that produced the match */
+	config: CustomPersonalityConfig;
 }
 
 /**
@@ -32,12 +54,22 @@ export interface PromptBuilderDeps {
 export interface SystemPromptResult {
 	prompt: string;
 	version?: string;
+	/**
+	 * Built-in prompt type, when a built-in matcher won. `undefined` when a
+	 * custom personality (see `customPersonality`) won.
+	 */
 	type?:
 		| "debugger"
 		| "builder"
 		| "scoper"
 		| "orchestrator"
 		| "graphite-orchestrator";
+	/**
+	 * Set when a user-defined custom personality matched the issue labels.
+	 * Callers should pass `customPersonality.config` to the tool resolver
+	 * and runner builder to apply its tool / model overrides.
+	 */
+	customPersonality?: CustomPersonalityMatch;
 }
 
 /**
@@ -60,12 +92,16 @@ export class PromptBuilder {
 	private readonly repositories: Map<string, RepositoryConfig>;
 	private readonly issueTrackers: Map<string, IIssueTrackerService>;
 	private readonly gitService: GitService;
+	private readonly getWorkspaceCustomPersonalities?: () =>
+		| CustomPersonalities
+		| undefined;
 
 	constructor(deps: PromptBuilderDeps) {
 		this.logger = deps.logger;
 		this.repositories = deps.repositories;
 		this.issueTrackers = deps.issueTrackers;
 		this.gitService = deps.gitService;
+		this.getWorkspaceCustomPersonalities = deps.getWorkspaceCustomPersonalities;
 	}
 
 	// ========================================================================
@@ -82,12 +118,37 @@ export class PromptBuilder {
 	async determineSystemPromptFromLabels(
 		labels: string[],
 		repositories: RepositoryConfig[],
+		issueDescription?: string,
 	): Promise<SystemPromptResult | undefined> {
+		const lowercaseLabels = labels.map((label) => label.toLowerCase());
+
+		// PRIORITY 0: Explicit `[personality=<key>]` description tag wins over
+		// label matching entirely — operators (or non-technical authors) can
+		// invoke a personality without changing Linear labels.
+		const tagMatch = await this.matchCustomPersonalityFromDescriptionTag(
+			issueDescription,
+			labels,
+			repositories,
+		);
+		if (tagMatch) {
+			return tagMatch;
+		}
+
 		if (labels.length === 0) {
 			return undefined;
 		}
 
-		const lowercaseLabels = labels.map((label) => label.toLowerCase());
+		// PRIORITY 1: User-defined custom personalities (per-repo, then workspace).
+		// These intentionally run before the built-in matchers so users can shadow
+		// the defaults with their own prompts.
+		const customMatch = await this.matchCustomPersonality(
+			lowercaseLabels,
+			labels,
+			repositories,
+		);
+		if (customMatch) {
+			return customMatch;
+		}
 
 		// HARDCODED RULE: Always check for 'orchestrator' label (case-insensitive)
 		// regardless of whether any repository.labelPrompts is configured.
@@ -169,6 +230,355 @@ export class PromptBuilder {
 		}
 
 		return winningResult;
+	}
+
+	/**
+	 * Match a user-defined custom personality against the issue labels.
+	 *
+	 * Resolution order:
+	 *   1. Per-repository `customPersonalities` (in repo array order; first
+	 *      repo whose personality matches wins)
+	 *   2. Workspace-wide `customPersonalities` from EdgeWorkerConfig
+	 *
+	 * Within a single map, entries are iterated in insertion order; the
+	 * first personality whose labels list intersects the issue labels wins.
+	 *
+	 * After a winner is picked, any *additional* matching personality is
+	 * logged via `logger.warn` as a conflict so operators can clean up
+	 * ambiguous config. The exception: a workspace personality sharing its
+	 * key with a per-repo personality is a precedence override, not a
+	 * conflict, and is suppressed.
+	 *
+	 * Returns `undefined` if no custom personality matched.
+	 */
+	private async matchCustomPersonality(
+		lowercaseLabels: string[],
+		labels: string[],
+		repositories: RepositoryConfig[],
+	): Promise<SystemPromptResult | undefined> {
+		// Collect every personality (per-repo first, then workspace) whose
+		// labels intersect the issue labels. We resolve the winner from this
+		// list and then warn on any remaining matches.
+		type Candidate = {
+			key: string;
+			config: CustomPersonalityConfig;
+			source: "repository" | "workspace";
+			repositoryId?: string;
+			matchingLabels: string[];
+		};
+
+		const candidates: Candidate[] = [];
+		const perRepoKeys = new Set<string>();
+
+		for (const repository of repositories) {
+			const personalities = repository.customPersonalities;
+			if (!personalities) continue;
+
+			for (const [key, config] of Object.entries(personalities)) {
+				perRepoKeys.add(key);
+				const matchingLabels = this.matchPersonalityLabels(
+					lowercaseLabels,
+					labels,
+					config,
+				);
+				if (matchingLabels.length > 0) {
+					candidates.push({
+						key,
+						config,
+						source: "repository",
+						repositoryId: repository.id,
+						matchingLabels,
+					});
+				}
+			}
+		}
+
+		const workspacePersonalities = this.getWorkspaceCustomPersonalities?.();
+		if (workspacePersonalities) {
+			for (const [key, config] of Object.entries(workspacePersonalities)) {
+				const matchingLabels = this.matchPersonalityLabels(
+					lowercaseLabels,
+					labels,
+					config,
+				);
+				if (matchingLabels.length > 0) {
+					candidates.push({
+						key,
+						config,
+						source: "workspace",
+						matchingLabels,
+					});
+				}
+			}
+		}
+
+		if (candidates.length === 0) {
+			return undefined;
+		}
+
+		// Pick the first loadable candidate as the winner; if a prompt file
+		// fails to load we fall through to the next candidate (preserving the
+		// previous behavior where unreadable prompts fall through to built-ins).
+		let winner: Candidate | undefined;
+		let winnerResult: SystemPromptResult | undefined;
+		let winnerIndex = -1;
+
+		for (let i = 0; i < candidates.length; i++) {
+			const candidate = candidates[i]!;
+			const loaded = await this.loadCustomPersonalityPrompt(
+				candidate.key,
+				candidate.config,
+				labels,
+				candidate.source,
+				candidate.repositoryId,
+			);
+			if (loaded) {
+				winner = candidate;
+				winnerResult = loaded;
+				winnerIndex = i;
+				break;
+			}
+		}
+
+		if (!winner || !winnerResult) {
+			return undefined;
+		}
+
+		// Warn on any *other* matching candidate. Suppress the workspace-vs-
+		// per-repo same-key case — that's a precedence override, not a
+		// conflict.
+		for (let i = 0; i < candidates.length; i++) {
+			if (i === winnerIndex) continue;
+			const other = candidates[i]!;
+
+			if (other.source === "workspace" && perRepoKeys.has(other.key)) {
+				continue;
+			}
+
+			const winnerSource = this.formatPersonalitySource(winner);
+			const otherSource = this.formatPersonalitySource(other);
+			this.logger.warn(
+				`Custom personality conflict: '${other.key}' (${otherSource}) would also match labels [${other.matchingLabels.join(", ")}] ` +
+					`but '${winner.key}' (${winnerSource}) already matched (first match wins)`,
+			);
+		}
+
+		return winnerResult;
+	}
+
+	/**
+	 * Format a personality source for log messages.
+	 */
+	private formatPersonalitySource(candidate: {
+		source: "repository" | "workspace";
+		repositoryId?: string;
+	}): string {
+		return candidate.source === "repository"
+			? `repository:${candidate.repositoryId ?? "?"}`
+			: "workspace";
+	}
+
+	/**
+	 * Returns the issue labels (in their original casing) that match any of
+	 * the personality's configured labels. Used both to decide whether a
+	 * personality matches and to surface the matching labels in conflict
+	 * warnings.
+	 */
+	private findMatchingLabels(
+		lowercaseIssueLabels: string[],
+		issueLabels: string[],
+		personalityLabels: string[],
+	): string[] {
+		const personalityLowercase = new Set(
+			personalityLabels.map((label) => label.toLowerCase()),
+		);
+		const matched: string[] = [];
+		for (let i = 0; i < lowercaseIssueLabels.length; i++) {
+			if (personalityLowercase.has(lowercaseIssueLabels[i]!)) {
+				matched.push(issueLabels[i] ?? lowercaseIssueLabels[i]!);
+			}
+		}
+		return matched;
+	}
+
+	/**
+	 * Like `findMatchingLabels` but honors the personality's `requireAllLabels`
+	 * flag. Returns an empty array (= no match) when the flag is set and the
+	 * issue is missing any of the personality's configured labels.
+	 */
+	private matchPersonalityLabels(
+		lowercaseIssueLabels: string[],
+		issueLabels: string[],
+		personality: CustomPersonalityConfig,
+	): string[] {
+		const matched = this.findMatchingLabels(
+			lowercaseIssueLabels,
+			issueLabels,
+			personality.labels,
+		);
+		if (matched.length === 0) {
+			return matched;
+		}
+		if (
+			personality.requireAllLabels &&
+			matched.length < personality.labels.length
+		) {
+			return [];
+		}
+		return matched;
+	}
+
+	/**
+	 * Match a custom personality named explicitly in the issue description
+	 * via a `[personality=<key>]` tag. The tag takes precedence over label
+	 * matching, lets non-technical authors opt in without managing Linear
+	 * labels, and respects per-repo-over-workspace key precedence (same
+	 * resolution order as `matchCustomPersonality`).
+	 *
+	 * Returns `undefined` when there's no description, no tag, the named
+	 * personality is not configured, or its prompt file fails to load.
+	 */
+	private async matchCustomPersonalityFromDescriptionTag(
+		issueDescription: string | undefined,
+		issueLabels: string[],
+		repositories: RepositoryConfig[],
+	): Promise<SystemPromptResult | undefined> {
+		if (!issueDescription) return undefined;
+
+		const requestedKey = this.parsePersonalityTag(issueDescription);
+		if (!requestedKey) return undefined;
+
+		for (const repository of repositories) {
+			const config = repository.customPersonalities?.[requestedKey];
+			if (config) {
+				const loaded = await this.loadCustomPersonalityPrompt(
+					requestedKey,
+					config,
+					issueLabels,
+					"repository",
+					repository.id,
+				);
+				if (loaded) {
+					this.logger.debug(
+						`Custom personality '${requestedKey}' invoked via [personality=...] description tag (repository:${repository.id})`,
+					);
+					return loaded;
+				}
+			}
+		}
+
+		const workspacePersonalities = this.getWorkspaceCustomPersonalities?.();
+		const workspaceConfig = workspacePersonalities?.[requestedKey];
+		if (workspaceConfig) {
+			const loaded = await this.loadCustomPersonalityPrompt(
+				requestedKey,
+				workspaceConfig,
+				issueLabels,
+				"workspace",
+			);
+			if (loaded) {
+				this.logger.debug(
+					`Custom personality '${requestedKey}' invoked via [personality=...] description tag (workspace)`,
+				);
+				return loaded;
+			}
+		}
+
+		this.logger.warn(
+			`Issue description requested '[personality=${requestedKey}]' but no matching personality is configured`,
+		);
+		return undefined;
+	}
+
+	/**
+	 * Extract the `[personality=<key>]` value from an issue description, if
+	 * present. Mirrors `RunnerSelectionService.parseDescriptionTag`'s tolerant
+	 * matching (escaped brackets, case-insensitive). Kept inline here to
+	 * avoid a circular dep between PromptBuilder and RunnerSelectionService.
+	 */
+	private parsePersonalityTag(description: string): string | undefined {
+		const match = description.match(
+			/\\?\[personality=([a-zA-Z0-9_.:/-]+)\\?\]/i,
+		);
+		return match?.[1];
+	}
+
+	/**
+	 * Load the markdown file for a custom personality and build the result.
+	 * Returns `undefined` (and logs) if the file cannot be read; callers
+	 * should fall through to the next personality / built-in matcher.
+	 */
+	private async loadCustomPersonalityPrompt(
+		key: string,
+		config: CustomPersonalityConfig,
+		originalLabels: string[],
+		source: "repository" | "workspace",
+		repositoryId?: string,
+	): Promise<SystemPromptResult | undefined> {
+		try {
+			const rawPrompt = await readFile(config.promptPath, "utf-8");
+			const version = this.extractVersionTag(rawPrompt);
+			const prompt = this.appendReferenceContext(
+				rawPrompt,
+				config.referenceDirs,
+			);
+
+			this.logger.debug(
+				`Using custom personality '${key}' (${source}${
+					repositoryId ? `:${repositoryId}` : ""
+				}) for labels: ${originalLabels.join(", ")}`,
+			);
+			if (version) {
+				this.logger.debug(
+					`Custom personality '${key}' prompt version: ${version}`,
+				);
+			}
+
+			return {
+				prompt,
+				version,
+				customPersonality: {
+					key,
+					source,
+					repositoryId,
+					config,
+				},
+			};
+		} catch (error) {
+			this.logger.error(
+				`Failed to load custom personality '${key}' prompt at ${config.promptPath}:`,
+				error,
+			);
+			return undefined;
+		}
+	}
+
+	/**
+	 * Append a `<reference_context>` block listing the personality's
+	 * `referenceDirs` to the loaded prompt content. The block instructs the
+	 * agent to consult those paths for style and prior-work context before
+	 * producing new work.
+	 *
+	 * No-op when `referenceDirs` is unset or empty.
+	 */
+	private appendReferenceContext(
+		prompt: string,
+		referenceDirs: string[] | undefined,
+	): string {
+		if (!referenceDirs || referenceDirs.length === 0) {
+			return prompt;
+		}
+		const dirList = referenceDirs.map((dir) => `- ${dir}`).join("\n");
+		const block = `
+
+<reference_context>
+The following workspace-relative directories contain reference material you should consult for voice, style, and prior context before producing new work:
+
+${dirList}
+
+Use Glob, Grep, and Read to explore them. Treat them as authoritative examples of the expected tone, structure, and conventions.
+</reference_context>`;
+		return prompt + block;
 	}
 
 	/**
@@ -1240,7 +1650,7 @@ ${reply.body}
 				{
 					headers: {
 						Accept: "application/vnd.github.v3+json",
-						"User-Agent": "Cyrus-Agent",
+						"User-Agent": "Agitha-Agent",
 					},
 				},
 			);

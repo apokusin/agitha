@@ -65,27 +65,27 @@ importers:
       '@sentry/node':
         specifier: ^9.47.1
         version: 9.47.1
+      agitha-claude-runner:
+        specifier: workspace:*
+        version: link:../../packages/claude-runner
+      agitha-cloudflare-tunnel-client:
+        specifier: workspace:*
+        version: link:../../packages/cloudflare-tunnel-client
+      agitha-config-updater:
+        specifier: workspace:*
+        version: link:../../packages/config-updater
+      agitha-core:
+        specifier: workspace:*
+        version: link:../../packages/core
+      agitha-edge-worker:
+        specifier: workspace:*
+        version: link:../../packages/edge-worker
+      agitha-slack-event-transport:
+        specifier: workspace:*
+        version: link:../../packages/slack-event-transport
       commander:
         specifier: ^14.0.2
         version: 14.0.3
-      cyrus-claude-runner:
-        specifier: workspace:*
-        version: link:../../packages/claude-runner
-      cyrus-cloudflare-tunnel-client:
-        specifier: workspace:*
-        version: link:../../packages/cloudflare-tunnel-client
-      cyrus-config-updater:
-        specifier: workspace:*
-        version: link:../../packages/config-updater
-      cyrus-core:
-        specifier: workspace:*
-        version: link:../../packages/core
-      cyrus-edge-worker:
-        specifier: workspace:*
-        version: link:../../packages/edge-worker
-      cyrus-slack-event-transport:
-        specifier: workspace:*
-        version: link:../../packages/slack-event-transport
       dotenv:
         specifier: ^16.5.0
         version: 16.6.1
@@ -129,21 +129,21 @@ importers:
 
   apps/f1:
     dependencies:
+      agitha-claude-runner:
+        specifier: workspace:*
+        version: link:../../packages/claude-runner
+      agitha-core:
+        specifier: workspace:*
+        version: link:../../packages/core
+      agitha-edge-worker:
+        specifier: workspace:*
+        version: link:../../packages/edge-worker
+      agitha-slack-event-transport:
+        specifier: workspace:*
+        version: link:../../packages/slack-event-transport
       commander:
         specifier: ^14.0.2
         version: 14.0.3
-      cyrus-claude-runner:
-        specifier: workspace:*
-        version: link:../../packages/claude-runner
-      cyrus-core:
-        specifier: workspace:*
-        version: link:../../packages/core
-      cyrus-edge-worker:
-        specifier: workspace:*
-        version: link:../../packages/edge-worker
-      cyrus-slack-event-transport:
-        specifier: workspace:*
-        version: link:../../packages/slack-event-transport
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -166,7 +166,7 @@ importers:
       '@linear/sdk':
         specifier: ^64.0.0
         version: 64.0.0(encoding@0.1.13)
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
       dotenv:
@@ -216,10 +216,10 @@ importers:
       '@openai/codex-sdk':
         specifier: ^0.125.0
         version: 0.125.0
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
-      cyrus-simple-agent-runner:
+      agitha-simple-agent-runner:
         specifier: workspace:*
         version: link:../simple-agent-runner
     devDependencies:
@@ -238,7 +238,7 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: '>=1.26.0'
         version: 1.29.0(zod@4.3.6)
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
       fastify:
@@ -291,10 +291,10 @@ importers:
       '@cursor/sdk':
         specifier: ^1.0.11
         version: 1.0.11
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
-      cyrus-simple-agent-runner:
+      agitha-simple-agent-runner:
         specifier: workspace:*
         version: link:../simple-agent-runner
     devDependencies:
@@ -319,48 +319,48 @@ importers:
       '@ngrok/ngrok':
         specifier: ^1.5.1
         version: 1.7.0
+      agitha-claude-runner:
+        specifier: workspace:*
+        version: link:../claude-runner
+      agitha-cloudflare-tunnel-client:
+        specifier: workspace:*
+        version: link:../cloudflare-tunnel-client
+      agitha-codex-runner:
+        specifier: workspace:*
+        version: link:../codex-runner
+      agitha-config-updater:
+        specifier: workspace:*
+        version: link:../config-updater
+      agitha-core:
+        specifier: workspace:*
+        version: link:../core
+      agitha-cursor-runner:
+        specifier: workspace:*
+        version: link:../cursor-runner
+      agitha-gemini-runner:
+        specifier: workspace:*
+        version: link:../gemini-runner
+      agitha-github-event-transport:
+        specifier: workspace:*
+        version: link:../github-event-transport
+      agitha-gitlab-event-transport:
+        specifier: workspace:*
+        version: link:../gitlab-event-transport
+      agitha-linear-event-transport:
+        specifier: workspace:*
+        version: link:../linear-event-transport
+      agitha-mcp-tools:
+        specifier: workspace:*
+        version: link:../mcp-tools
+      agitha-simple-agent-runner:
+        specifier: workspace:*
+        version: link:../simple-agent-runner
+      agitha-slack-event-transport:
+        specifier: workspace:*
+        version: link:../slack-event-transport
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
-      cyrus-claude-runner:
-        specifier: workspace:*
-        version: link:../claude-runner
-      cyrus-cloudflare-tunnel-client:
-        specifier: workspace:*
-        version: link:../cloudflare-tunnel-client
-      cyrus-codex-runner:
-        specifier: workspace:*
-        version: link:../codex-runner
-      cyrus-config-updater:
-        specifier: workspace:*
-        version: link:../config-updater
-      cyrus-core:
-        specifier: workspace:*
-        version: link:../core
-      cyrus-cursor-runner:
-        specifier: workspace:*
-        version: link:../cursor-runner
-      cyrus-gemini-runner:
-        specifier: workspace:*
-        version: link:../gemini-runner
-      cyrus-github-event-transport:
-        specifier: workspace:*
-        version: link:../github-event-transport
-      cyrus-gitlab-event-transport:
-        specifier: workspace:*
-        version: link:../gitlab-event-transport
-      cyrus-linear-event-transport:
-        specifier: workspace:*
-        version: link:../linear-event-transport
-      cyrus-mcp-tools:
-        specifier: workspace:*
-        version: link:../mcp-tools
-      cyrus-simple-agent-runner:
-        specifier: workspace:*
-        version: link:../simple-agent-runner
-      cyrus-slack-event-transport:
-        specifier: workspace:*
-        version: link:../slack-event-transport
       fastify:
         specifier: ^5.8.5
         version: 5.8.5
@@ -407,13 +407,13 @@ importers:
       '@linear/sdk':
         specifier: ^60.0.0
         version: 60.0.0(encoding@0.1.13)
-      cyrus-claude-runner:
+      agitha-claude-runner:
         specifier: workspace:*
         version: link:../claude-runner
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
-      cyrus-simple-agent-runner:
+      agitha-simple-agent-runner:
         specifier: workspace:*
         version: link:../simple-agent-runner
       dotenv:
@@ -444,7 +444,7 @@ importers:
 
   packages/github-event-transport:
     dependencies:
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
       fastify:
@@ -463,7 +463,7 @@ importers:
 
   packages/gitlab-event-transport:
     dependencies:
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
       fastify:
@@ -485,7 +485,7 @@ importers:
       '@linear/sdk':
         specifier: ^64.0.0
         version: 64.0.0(encoding@0.1.13)
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
       fastify:
@@ -538,10 +538,10 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: 0.2.123
         version: 0.2.123(zod@4.3.6)
-      cyrus-claude-runner:
+      agitha-claude-runner:
         specifier: workspace:*
         version: link:../claude-runner
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -557,7 +557,7 @@ importers:
 
   packages/slack-event-transport:
     dependencies:
-      cyrus-core:
+      agitha-core:
         specifier: workspace:*
         version: link:../core
       fastify:

@@ -4,8 +4,8 @@ import type {
 	HookCallbackMatcher,
 	HookEvent,
 	PostToolUseHookInput,
-} from "cyrus-claude-runner";
-import type { ILogger } from "cyrus-core";
+} from "agitha-claude-runner";
+import type { ILogger } from "agitha-core";
 
 /**
  * Tool names whose successful invocation may have produced a brand-new file

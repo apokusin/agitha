@@ -9,7 +9,7 @@ import type {
 	AgentRunnerConfig,
 	AgentSessionInfo,
 	SDKMessage,
-} from "cyrus-core";
+} from "agitha-core";
 
 export type CodexConfigValue =
 	| string

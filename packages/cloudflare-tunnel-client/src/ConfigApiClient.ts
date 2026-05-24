@@ -1,19 +1,19 @@
 /**
- * Default Cyrus app base URL
- * Can be overridden via CYRUS_APP_URL environment variable for preview environments
+ * Default Agitha app base URL
+ * Can be overridden via AGITHA_APP_URL environment variable for preview environments
  */
-export const DEFAULT_CYRUS_APP_URL = "https://app.atcyrus.com";
+export const DEFAULT_AGITHA_APP_URL = "https://app.atagitha.com";
 
 /**
- * Get the Cyrus app base URL from environment variable or use default
- * @returns The Cyrus app base URL (e.g., "https://app.atcyrus.com")
+ * Get the Agitha app base URL from environment variable or use default
+ * @returns The Agitha app base URL (e.g., "https://app.atagitha.com")
  */
-export function getCyrusAppUrl(): string {
-	return process.env.CYRUS_APP_URL || DEFAULT_CYRUS_APP_URL;
+export function getAgithaAppUrl(): string {
+	return process.env.AGITHA_APP_URL || DEFAULT_AGITHA_APP_URL;
 }
 
 /**
- * Config API response from cyrus-hosted
+ * Config API response from agitha-hosted
  */
 export interface ConfigApiResponse {
 	success: boolean;
@@ -25,16 +25,16 @@ export interface ConfigApiResponse {
 }
 
 /**
- * Client for retrieving configuration from cyrus-hosted
+ * Client for retrieving configuration from agitha-hosted
  * Authenticates using auth keys provided during onboarding
  */
 // biome-ignore lint/complexity/noStaticOnlyClass: Static utility client keeps existing callsites stable.
 export class ConfigApiClient {
 	/**
-	 * Get the config API URL, respecting CYRUS_APP_URL environment variable
+	 * Get the config API URL, respecting AGITHA_APP_URL environment variable
 	 */
 	private static getConfigApiUrl(): string {
-		return `${getCyrusAppUrl()}/api/config`;
+		return `${getAgithaAppUrl()}/api/config`;
 	}
 
 	/**

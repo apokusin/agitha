@@ -3,7 +3,8 @@ import type {
 	IIssueTrackerService,
 	ILogger,
 	RepositoryConfig,
-} from "cyrus-core";
+} from "agitha-core";
+import type { CustomPersonalityMatch } from "./PromptBuilder.js";
 
 export class ActivityPoster {
 	private issueTrackers: Map<string, IIssueTrackerService>;
@@ -158,10 +159,42 @@ export class ActivityPoster {
 		labels: string[],
 		workspaceId: string,
 		repositoryId: string,
+		customPersonality?: CustomPersonalityMatch,
 	): Promise<void> {
 		const issueTracker = this.issueTrackers.get(workspaceId);
 		if (!issueTracker) {
 			this.logger.warn(`No issue tracker found for workspace ${workspaceId}`);
+			return;
+		}
+
+		// Custom personality path: bypass built-in type matching entirely
+		if (customPersonality) {
+			const lowercaseIssueLabels = labels.map((l) => l.toLowerCase());
+			const triggerLabel = customPersonality.config.labels.find((label) =>
+				lowercaseIssueLabels.includes(label.toLowerCase()),
+			);
+
+			// Defensive: if no trigger label matches, skip posting
+			if (!triggerLabel) {
+				return;
+			}
+
+			const description = customPersonality.config.description;
+			const body = description
+				? `Entering '${customPersonality.key}' personality (${description}) because of the '${triggerLabel}' label. I'll follow the custom instructions.`
+				: `Entering '${customPersonality.key}' personality because of the '${triggerLabel}' label. I'll follow the custom instructions.`;
+
+			await this.postActivityDirect(
+				issueTracker,
+				{
+					agentSessionId: sessionId,
+					content: {
+						type: "thought",
+						body,
+					},
+				},
+				"system prompt selection",
+			);
 			return;
 		}
 

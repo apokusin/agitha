@@ -24,7 +24,7 @@ import type {
 	SDKMessage,
 	SDKResultMessage,
 	SDKUserMessage,
-} from "cyrus-core";
+} from "agitha-core";
 import { CodexMessageFormatter } from "./formatter.js";
 import type {
 	CodexConfigOverrides,
@@ -384,7 +384,7 @@ export declare interface CodexRunner {
 }
 
 /**
- * Runner that adapts Codex SDK streaming output to Cyrus SDK message types.
+ * Runner that adapts Codex SDK streaming output to Agitha SDK message types.
  */
 export class CodexRunner extends EventEmitter implements IAgentRunner {
 	readonly supportsStreamingInput = false;

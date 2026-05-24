@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TEST_CYRUS_HOME } from "./test-dirs.js";
+import { TEST_AGITHA_HOME } from "./test-dirs.js";
 
 // Mock dependencies BEFORE imports
-vi.mock("cyrus-claude-runner", () => ({
+vi.mock("agitha-claude-runner", () => ({
 	ClaudeRunner: vi.fn(),
 	getSafeTools: vi.fn(() => [
 		"Read",
@@ -122,7 +122,7 @@ vi.mock("cyrus-claude-runner", () => ({
 	]),
 }));
 vi.mock("@linear/sdk");
-vi.mock("cyrus-linear-event-transport");
+vi.mock("agitha-linear-event-transport");
 vi.mock("../src/SharedApplicationServer.js");
 vi.mock("../src/AgentSessionManager.js");
 vi.mock("fs/promises", () => ({
@@ -136,8 +136,8 @@ import { LinearClient } from "@linear/sdk";
 import {
 	LINEAR_DEFAULT_ALLOWED_TOOLS,
 	SLACK_DEFAULT_ALLOWED_TOOLS,
-} from "cyrus-core";
-import { LinearEventTransport } from "cyrus-linear-event-transport";
+} from "agitha-core";
+import { LinearEventTransport } from "agitha-linear-event-transport";
 import { AgentSessionManager } from "../src/AgentSessionManager.js";
 import { EdgeWorker } from "../src/EdgeWorker.js";
 import { SharedApplicationServer } from "../src/SharedApplicationServer.js";
@@ -160,7 +160,7 @@ describe("EdgeWorker - Multi-Repo Tool Authorization", () => {
 
 		mockConfig = {
 			proxyUrl: "http://localhost:3000",
-			cyrusHome: TEST_CYRUS_HOME,
+			agithaHome: TEST_AGITHA_HOME,
 			linearAllowedTools: ["Read", "Write", "Edit"],
 			repositories: [
 				{

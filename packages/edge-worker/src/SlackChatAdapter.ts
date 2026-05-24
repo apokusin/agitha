@@ -1,12 +1,12 @@
-import type { IAgentRunner, ILogger } from "cyrus-core";
-import { createLogger } from "cyrus-core";
+import type { IAgentRunner, ILogger } from "agitha-core";
+import { createLogger } from "agitha-core";
 import {
 	SlackMessageService,
 	SlackReactionService,
 	type SlackThreadMessage,
 	type SlackWebhookEvent,
 	stripMention as stripSlackMention,
-} from "cyrus-slack-event-transport";
+} from "agitha-slack-event-transport";
 import type { ChatRepositoryProvider } from "./ChatRepositoryProvider.js";
 import type { ChatPlatformAdapter } from "./ChatSessionHandler.js";
 
@@ -120,8 +120,8 @@ ${repositoryAccessSection}
 ${this.repositoryRoutingContext ? `\n\n${this.repositoryRoutingContext}` : ""}
 
 ## Self-Knowledge
-- If the user asks about your capabilities, features, how you work, what you can do, setup instructions, or anything related to Cyrus documentation, use the \`mcp__cyrus-docs__search_documentation\` tool to look up the answer from the official Cyrus docs.
-- Always prefer searching the docs over guessing or relying on your training data for Cyrus-specific questions.
+- If the user asks about your capabilities, features, how you work, what you can do, setup instructions, or anything related to Agitha documentation, use the \`mcp__agitha-docs__search_documentation\` tool to look up the answer from the official Agitha docs.
+- Always prefer searching the docs over guessing or relying on your training data for Agitha-specific questions.
 
 ## Orchestration Notes
 - If the user asks you to make repo code changes immediately, use these steps:
@@ -130,8 +130,8 @@ ${this.repositoryRoutingContext ? `\n\n${this.repositoryRoutingContext}` : ""}
   - To route the issue to a specific repository, add \`[repo=repo-name]\` to the issue description. To target a specific branch, use \`[repo=repo-name#branch-name]\`. For multiple repos: \`repos=repo1,repo2\`.
   - Assign that Issue to that same user (your own Linear user).
   - That assignment is what immediately kicks off work in your own agent session.
-  - Track execution progress by searching \`mcp__cyrus-tools__linear_get_agent_sessions\` for the active session, then opening it with \`mcp__cyrus-tools__linear_get_agent_session\`.
-  - To send mid-flight feedback or corrections to a running child session, use \`mcp__cyrus-tools__linear_agent_give_feedback\` with the session ID returned by \`linear_get_agent_sessions\`. This is the ONLY way to directly prompt a running child agent. \`mcp__linear__save_comment\` does NOT trigger or notify the agent in any way — it just writes a comment on the issue, which the running session will not see. Always prefer \`linear_agent_give_feedback\` when the child agent is actively working.
+  - Track execution progress by searching \`mcp__agitha-tools__linear_get_agent_sessions\` for the active session, then opening it with \`mcp__agitha-tools__linear_get_agent_session\`.
+  - To send mid-flight feedback or corrections to a running child session, use \`mcp__agitha-tools__linear_agent_give_feedback\` with the session ID returned by \`linear_get_agent_sessions\`. This is the ONLY way to directly prompt a running child agent. \`mcp__linear__save_comment\` does NOT trigger or notify the agent in any way — it just writes a comment on the issue, which the running session will not see. Always prefer \`linear_agent_give_feedback\` when the child agent is actively working.
 
 ## Slack Message Formatting (CRITICAL)
 Your response will be posted as a Slack message. Slack uses its own "mrkdwn" format, which is NOT standard Markdown. You MUST follow these rules exactly.

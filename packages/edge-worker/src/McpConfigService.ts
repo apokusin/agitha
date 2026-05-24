@@ -1,17 +1,17 @@
 import type { LinearClient } from "@linear/sdk";
-import type { McpServerConfig } from "cyrus-claude-runner";
-import type { IIssueTrackerService, RepositoryConfig } from "cyrus-core";
+import type { McpServerConfig } from "agitha-claude-runner";
+import type { IIssueTrackerService, RepositoryConfig } from "agitha-core";
 import {
-	type CyrusToolsOptions,
-	createCyrusToolsServer,
-} from "cyrus-mcp-tools";
+	type AgithaToolsOptions,
+	createAgithaToolsServer,
+} from "agitha-mcp-tools";
 
-type CyrusToolsMcpContextEntry = {
+type AgithaToolsMcpContextEntry = {
 	contextId: string;
 	linearToken: string;
 	linearClient: LinearClient;
 	parentSessionId?: string;
-	prebuiltServer?: ReturnType<typeof createCyrusToolsServer>;
+	prebuiltServer?: ReturnType<typeof createAgithaToolsServer>;
 	createdAt: number;
 };
 
@@ -25,34 +25,34 @@ export interface McpConfigServiceDeps {
 	getIssueTracker: (
 		workspaceId: string,
 	) => (IIssueTrackerService & { getClient?: () => LinearClient }) | undefined;
-	/** Get the HTTP URL where the cyrus-tools MCP endpoint is registered */
-	getCyrusToolsMcpUrl: () => string;
-	/** Factory that creates CyrusToolsOptions with session callbacks */
-	createCyrusToolsOptions: (parentSessionId?: string) => CyrusToolsOptions;
+	/** Get the HTTP URL where the agitha-tools MCP endpoint is registered */
+	getAgithaToolsMcpUrl: () => string;
+	/** Factory that creates AgithaToolsOptions with session callbacks */
+	createAgithaToolsOptions: (parentSessionId?: string) => AgithaToolsOptions;
 }
 
 /**
  * Single source of truth for MCP server configuration assembly.
  *
  * Handles:
- * - Building inline MCP server configs (Linear, cyrus-tools, Slack)
+ * - Building inline MCP server configs (Linear, agitha-tools, Slack)
  * - Merging file-based MCP config paths from repositories
- * - Cyrus-tools MCP context lifecycle management
+ * - Agitha-tools MCP context lifecycle management
  *
  * Both EdgeWorker (issue sessions) and ChatSessionHandler (chat sessions)
  * consume this service instead of duplicating MCP config logic.
  */
 export class McpConfigService {
 	private deps: McpConfigServiceDeps;
-	private contexts = new Map<string, CyrusToolsMcpContextEntry>();
+	private contexts = new Map<string, AgithaToolsMcpContextEntry>();
 
 	constructor(deps: McpConfigServiceDeps) {
 		this.deps = deps;
 	}
 
 	/**
-	 * Build MCP configuration with automatic Linear server injection and cyrus-tools over Fastify MCP.
-	 * Workspace-level servers (Linear, cyrus-tools, Slack) are configured once using workspace-level token.
+	 * Build MCP configuration with automatic Linear server injection and agitha-tools over Fastify MCP.
+	 * Workspace-level servers (Linear, agitha-tools, Slack) are configured once using workspace-level token.
 	 *
 	 * Whether the agent can actually CALL into any of these servers is gated
 	 * by the per-platform allowed-tools array (`teams.{linear,slack,github}_allowed_tools`),
@@ -62,7 +62,7 @@ export class McpConfigService {
 	 *
 	 * @param repoId - Repository ID for MCP context scoping
 	 * @param linearWorkspaceId - Linear workspace ID (from webhook.organizationId or repo config)
-	 * @param parentSessionId - Parent session ID for cyrus-tools context
+	 * @param parentSessionId - Parent session ID for agitha-tools context
 	 */
 	buildMcpConfig(
 		repoId: string,
@@ -75,19 +75,19 @@ export class McpConfigService {
 		const linearToken = this.deps.getLinearTokenForWorkspace(linearWorkspaceId);
 		const issueTracker = this.deps.getIssueTracker(linearWorkspaceId);
 		if (!linearToken || !issueTracker?.getClient) {
-			// CLI platform mode — no Linear client available, return config without cyrus-tools
+			// CLI platform mode — no Linear client available, return config without agitha-tools
 			const mcpConfig: Record<string, McpServerConfig> = {
-				"cyrus-docs": {
+				"agitha-docs": {
 					type: "http",
-					url: "https://atcyrus.com/docs/mcp",
+					url: "https://atagitha.com/docs/mcp",
 				},
 			};
 			return mcpConfig;
 		}
 		const linearClient = issueTracker.getClient();
-		const prebuiltServer = createCyrusToolsServer(
+		const prebuiltServer = createAgithaToolsServer(
 			linearClient,
-			this.deps.createCyrusToolsOptions(parentSessionId),
+			this.deps.createAgithaToolsOptions(parentSessionId),
 		);
 
 		this.contexts.set(contextId, {
@@ -100,7 +100,7 @@ export class McpConfigService {
 		});
 		this.pruneContexts();
 
-		const cyrusToolsAuthorizationHeader = this.getAuthorizationHeaderValue();
+		const agithaToolsAuthorizationHeader = this.getAuthorizationHeaderValue();
 
 		// Workspace-level MCP servers — configured once regardless of repo count
 		// https://linear.app/docs/mcp
@@ -112,21 +112,21 @@ export class McpConfigService {
 					Authorization: `Bearer ${linearToken}`,
 				},
 			},
-			"cyrus-tools": {
+			"agitha-tools": {
 				type: "http",
-				url: this.deps.getCyrusToolsMcpUrl(),
+				url: this.deps.getAgithaToolsMcpUrl(),
 				headers: {
-					"x-cyrus-mcp-context-id": contextId,
-					...(cyrusToolsAuthorizationHeader
+					"x-agitha-mcp-context-id": contextId,
+					...(agithaToolsAuthorizationHeader
 						? {
-								Authorization: cyrusToolsAuthorizationHeader,
+								Authorization: agithaToolsAuthorizationHeader,
 							}
 						: {}),
 				},
 			},
-			"cyrus-docs": {
+			"agitha-docs": {
 				type: "http",
-				url: "https://atcyrus.com/docs/mcp",
+				url: "https://atagitha.com/docs/mcp",
 			},
 		};
 
@@ -179,10 +179,10 @@ export class McpConfigService {
 	}
 
 	/**
-	 * Look up a stored cyrus-tools MCP context by its ID.
+	 * Look up a stored agitha-tools MCP context by its ID.
 	 * Used by the MCP endpoint handler to retrieve prebuilt servers.
 	 */
-	getContext(contextId: string): CyrusToolsMcpContextEntry | undefined {
+	getContext(contextId: string): AgithaToolsMcpContextEntry | undefined {
 		return this.contexts.get(contextId);
 	}
 
@@ -204,10 +204,10 @@ export class McpConfigService {
 	}
 
 	/**
-	 * Get the authorization header value for cyrus-tools MCP requests.
+	 * Get the authorization header value for agitha-tools MCP requests.
 	 */
 	getAuthorizationHeaderValue(): string | undefined {
-		const apiKey = process.env.CYRUS_API_KEY?.trim();
+		const apiKey = process.env.AGITHA_API_KEY?.trim();
 		if (!apiKey) {
 			return undefined;
 		}

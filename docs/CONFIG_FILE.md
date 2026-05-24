@@ -1,8 +1,8 @@
-# Cyrus Configuration File
+# Agitha Configuration File
 
-Cyrus stores configuration in `~/.cyrus/config.json`. This file is created automatically during initial setup and can be edited manually to customize behavior.
+Agitha stores configuration in `~/.agitha/config.json`. This file is created automatically during initial setup and can be edited manually to customize behavior.
 
-Editing this manually only applies to those running the fully end-to-end self-hosted. Those who are paying for Cyrus, management of config.json is automated.
+Editing this manually only applies to those running the fully end-to-end self-hosted. Those who are paying for Agitha, management of config.json is automated.
 
 ---
 
@@ -52,7 +52,7 @@ Learn more about MCP: https://code.claude.com/docs/en/mcp
 
 ### `teamKeys` (array of strings)
 
-Routes Linear issues from specific teams to this repository. When specified, only issues from matching teams trigger Cyrus.
+Routes Linear issues from specific teams to this repository. When specified, only issues from matching teams trigger Agitha.
 
 Example: `["CEE", "FRONT", "BACK"]` - Only process issues from teams CEE, FRONT, and BACK
 
@@ -74,7 +74,7 @@ Example: `["backend", "api"]` - Only process issues that have the "backend" or "
 
 ## Routing Priority Order
 
-When multiple routing configurations are present, Cyrus evaluates them in the following priority order:
+When multiple routing configurations are present, Agitha evaluates them in the following priority order:
 
 1. **`routingLabels`** (highest priority) - Label-based routing
 2. **`projectKeys`** (medium priority) - Project-based routing
@@ -142,9 +142,106 @@ Note: Linear MCP tools (`mcp__linear`) are always included automatically. Slack 
 
 ---
 
+## Custom Personalities
+
+> **Looking for working examples?** See [`packages/edge-worker/examples/personalities/`](../packages/edge-worker/examples/personalities/) — two complete personalities (a copy-writer and a code-reviewer) plus a README with copy-paste `config.json` snippets that exercise every feature documented below.
+
+### `customPersonalities` (object)
+
+User-defined agent personalities that pair Linear labels with your own system prompts and tool permissions. Custom personalities are matched **before** the built-in `labelPrompts` modes (debugger / builder / scoper / orchestrator) and take precedence when their labels match.
+
+Can be configured at the workspace level (top-level `customPersonalities` in `config.json`) or per-repository (inside a repository entry). Per-repository definitions are checked first and override workspace-level definitions on key collisions.
+
+**Properties per entry:**
+
+- **`labels`** (array of strings, required) — Linear label names that trigger this personality. Matching is case-insensitive.
+- **`promptPath`** (string, required) — Path to the system-prompt markdown file. Supports `~/` expansion (resolved against the user's home directory) and is resolved at config load time.
+- **`requireAllLabels`** (boolean, optional) — When true, the personality matches only when *every* label in `labels` is present on the issue. Default false (any single label match is enough). Use this for label combinations like `["Article", "Draft"]` that should not fire on every "Article" issue.
+- **`referenceDirs`** (array of strings, optional) — Workspace-relative directories the personality should treat as reference material (style guides, past work, voice examples). At session start these are listed in a `<reference_context>` block appended to the personality's system prompt, with an instruction to `Glob` / `Read` / `Grep` them for context. The directories still need to be reachable through the personality's `allowedTools`.
+- **`allowedTools`** (string or array, optional) — Tool list or preset (`"readOnly"`, `"safe"`, `"all"`, `"coordinator"`). When set, fully replaces the resolved tool list — the personality owns its tool surface.
+- **`disallowedTools`** (array of strings, optional) — Tools to explicitly deny. When set, fully replaces any per-repository / global disallow list.
+- **`writeScopes`** (array of strings, optional) — Workspace-relative glob patterns (e.g. `["./content/**"]`) that scope any unscoped `"Write"` or `"Edit"` entry in `allowedTools`. Already-parenthesized entries (e.g. `"Write(./other/**)"`) pass through unchanged. Has no effect when `allowedTools` is unset.
+- **`model`** (string, optional) — Model override for the runner (e.g., `"claude-opus-4-7"`). Takes precedence over per-issue description tags, per-repo `model`, and runner defaults.
+- **`description`** (string, optional) — Human-readable description shown in logs.
+
+**Workspace-level example:**
+
+```json
+{
+  "customPersonalities": {
+    "code-reviewer": {
+      "labels": ["Code Review", "PR Review"],
+      "promptPath": "~/.agitha/personalities/code-reviewer.md",
+      "allowedTools": "readOnly",
+      "model": "claude-opus-4-7",
+      "description": "Read-only code review personality"
+    },
+    "security-auditor": {
+      "labels": ["Security"],
+      "promptPath": "~/.agitha/personalities/security-auditor.md",
+      "allowedTools": ["Read", "Glob", "Grep", "WebFetch"]
+    }
+  },
+  "repositories": [...]
+}
+```
+
+**Per-repository example:**
+
+```json
+{
+  "repositories": [
+    {
+      "id": "...",
+      "customPersonalities": {
+        "design-doc-writer": {
+          "labels": ["Design Doc"],
+          "promptPath": "/abs/path/to/repo/.agitha/personalities/design.md",
+          "allowedTools": ["Read", "Glob", "Grep", "WebFetch", "mcp__linear"]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Notes:**
+
+- The prompt file should be valid markdown. Optionally include `<version-tag value="..." />` near the top to surface a version in logs.
+- When a custom personality matches, the built-in `labelPrompts` resolution is skipped and the personality's `allowedTools` / `disallowedTools` / `model` (when set) replace the corresponding chain entries.
+- When the personality omits `allowedTools` / `disallowedTools`, normal resolution applies (repository overrides, then global defaults).
+- If the prompt file cannot be read at session start, the personality is skipped and the built-in matcher runs as a fallback.
+
+### Scoping write access
+
+By default, granting a personality `"Write"` (or `"Edit"`) in `allowedTools` lets the agent write anywhere in the worktree. For personalities that should only touch a specific subtree — e.g. a copy-writer that only edits articles under `./content/` — declare `writeScopes` to constrain where writes can land:
+
+```json
+"copy-writer": {
+  "labels": ["Article"],
+  "promptPath": "~/.agitha/personalities/copy-writer.md",
+  "allowedTools": ["Read", "Glob", "Grep", "WebFetch", "Write"],
+  "writeScopes": ["./content/**"]
+}
+```
+
+At session start the bare `"Write"` is expanded into `"Write(./content/**)"`, so the final allow-list passed to the runner is `["Read", "Glob", "Grep", "WebFetch", "Write(./content/**)"]`. List multiple patterns to allow writes in several directories (e.g. `["./content/**", "./drafts/**"]` produces one `Write(<scope>)` entry per scope). Entries that are already parenthesized — for example `"Write(./other/**)"` — pass through verbatim and are not duplicated per scope.
+
+### Invoking a personality from the issue description
+
+Linear authors who don't want to manage labels — or who want to pick a personality ad-hoc — can name one directly in the issue description with a `[personality=<key>]` tag:
+
+```
+Draft a 600-word piece on edge networking. [personality=copy-writer]
+```
+
+The tag takes precedence over label matching: if `copy-writer` is configured anywhere (per-repo first, then workspace), it wins regardless of what labels are on the issue. If the tag names a personality that isn't configured, the matcher falls back to label-based matching and logs a warning. The tag syntax matches the existing `[agent=...]` / `[model=...]` description tags — escaped brackets and case-insensitive keys are both accepted.
+
+---
+
 ## User Access Control
 
-Control which Linear users can delegate issues to Cyrus. Supports both global configuration and per-repository overrides.
+Control which Linear users can delegate issues to Agitha. Supports both global configuration and per-repository overrides.
 
 ### `userAccessControl` (object)
 
@@ -290,9 +387,9 @@ When `networkPolicy.allow` is specified (or expanded from a preset), all domains
 
 ### CA Certificate Trust
 
-The egress proxy generates a CA certificate at `~/.cyrus/certs/cyrus-egress-ca.pem` for TLS interception of domains with transform rules. This cert is stable across restarts — once trusted, it stays trusted.
+The egress proxy generates a CA certificate at `~/.agitha/certs/agitha-egress-ca.pem` for TLS interception of domains with transform rules. This cert is stable across restarts — once trusted, it stays trusted.
 
-**Automatic (per-session, when `systemWideCert: false`):** Cyrus sets the following env vars automatically for every agent session:
+**Automatic (per-session, when `systemWideCert: false`):** Agitha sets the following env vars automatically for every agent session:
 
 | Env Var | Covers |
 |---------|--------|
@@ -306,7 +403,7 @@ The egress proxy generates a CA certificate at `~/.cyrus/certs/cyrus-egress-ca.p
 | `AWS_CA_BUNDLE` | AWS CLI, boto3 |
 | `DENO_CERT` | Deno |
 
-If `NODE_EXTRA_CA_CERTS` is already set in the host environment (e.g., corporate proxy), Cyrus merges both certs into a combined bundle.
+If `NODE_EXTRA_CA_CERTS` is already set in the host environment (e.g., corporate proxy), Agitha merges both certs into a combined bundle.
 
 **Not covered by env vars (require system-wide trust):**
 
@@ -320,10 +417,10 @@ For these tools, system-wide trust is required.
 
 ```bash
 # macOS
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.cyrus/certs/cyrus-egress-ca.pem
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.agitha/certs/agitha-egress-ca.pem
 
 # Linux
-sudo cp ~/.cyrus/certs/cyrus-egress-ca.pem /usr/local/share/ca-certificates/cyrus-egress-ca.crt
+sudo cp ~/.agitha/certs/agitha-egress-ca.pem /usr/local/share/ca-certificates/agitha-egress-ca.crt
 sudo update-ca-certificates
 ```
 
@@ -338,7 +435,7 @@ Then update config.json:
 }
 ```
 
-On startup, Cyrus checks whether the cert is trusted system-wide (macOS keychain or Linux CA certificates) and logs the result:
+On startup, Agitha checks whether the cert is trusted system-wide (macOS keychain or Linux CA certificates) and logs the result:
 
 ```
 🛡️  CA certificate is trusted system-wide ✓
@@ -349,7 +446,7 @@ or, if not yet trusted:
 
 ```
 [WARN] 🛡️  CA certificate is NOT trusted in the macOS System keychain. To trust (requires sudo):
-[WARN] 🛡️  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.cyrus/certs/cyrus-egress-ca.pem
+[WARN] 🛡️  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.agitha/certs/agitha-egress-ca.pem
 ```
 
 ---
@@ -386,7 +483,7 @@ Path to a script that runs for all repositories when creating new worktrees. See
 
 ## Tool Configuration Priority
 
-When determining allowed tools, Cyrus follows this priority order:
+When determining allowed tools, Agitha follows this priority order:
 
 1. Repository-specific prompt configuration (`labelPrompts.debugger.allowedTools`)
 2. Global prompt defaults (`promptDefaults.debugger.allowedTools`)
@@ -449,4 +546,4 @@ Each repository configuration includes these required fields:
 - `isActive` - Whether the repository is active
 - `linearWorkspaceId` - Linear workspace UUID (references a key in `linearWorkspaces`)
 
-These fields are managed automatically during setup. For self-hosted instances, use the `cyrus self-auth-linear` and `cyrus self-add-repo` commands.
+These fields are managed automatically during setup. For self-hosted instances, use the `agitha self-auth-linear` and `agitha self-add-repo` commands.

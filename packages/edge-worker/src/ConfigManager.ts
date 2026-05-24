@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
+import type { EdgeWorkerConfig, ILogger, RepositoryConfig } from "agitha-core";
 import { watch as chokidarWatch, type FSWatcher } from "chokidar";
-import type { EdgeWorkerConfig, ILogger, RepositoryConfig } from "cyrus-core";
 
 /**
  * Describes the set of repository-level changes detected after a config
@@ -227,6 +227,8 @@ export class ConfigManager extends EventEmitter {
 				defaultRunner: parsedConfig.defaultRunner || this.config.defaultRunner,
 				promptDefaults:
 					parsedConfig.promptDefaults || this.config.promptDefaults,
+				customPersonalities:
+					parsedConfig.customPersonalities || this.config.customPersonalities,
 				// Preserve legacy fields while rolling out new config keys.
 				defaultModel: parsedConfig.defaultModel || this.config.defaultModel,
 				defaultFallbackModel:
@@ -346,6 +348,7 @@ export class ConfigManager extends EventEmitter {
 			"githubMcpConfigs",
 			"defaultDisallowedTools",
 			"promptDefaults",
+			"customPersonalities",
 			"issueUpdateTrigger",
 			"linearWorkspaces",
 			"userAccessControl",

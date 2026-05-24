@@ -4,10 +4,10 @@ import {
 	type LogContext,
 	type LogEventAttributes,
 	type LogLevel,
-} from "cyrus-core";
+} from "agitha-core";
 
-// Re-export LogLevel from cyrus-core so existing consumers don't break
-export { LogLevel } from "cyrus-core";
+// Re-export LogLevel from agitha-core so existing consumers don't break
+export { LogLevel } from "agitha-core";
 
 /**
  * Logger configuration options

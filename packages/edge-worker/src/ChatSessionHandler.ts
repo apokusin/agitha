@@ -1,14 +1,14 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { SDKMessage } from "cyrus-claude-runner";
+import type { SDKMessage } from "agitha-claude-runner";
 import type {
 	AgentRunnerConfig,
 	AgentSessionInfo,
-	CyrusAgentSession,
+	AgithaAgentSession,
 	IAgentRunner,
 	ILogger,
-} from "cyrus-core";
-import { createLogger } from "cyrus-core";
+} from "agitha-core";
+import { createLogger } from "agitha-core";
 import { AgentSessionManager } from "./AgentSessionManager.js";
 import type { ChatRepositoryProvider } from "./ChatRepositoryProvider.js";
 import type { RunnerConfigBuilder } from "./RunnerConfigBuilder.js";
@@ -54,7 +54,7 @@ export interface ChatPlatformAdapter<TEvent> {
  * Callbacks for EdgeWorker integration (same pattern as RepositoryRouterDeps).
  */
 export interface ChatSessionHandlerDeps {
-	cyrusHome: string;
+	agithaHome: string;
 	/** Provider for live repository paths, default repo, and workspace ID */
 	chatRepositoryProvider: ChatRepositoryProvider;
 	/** Shared RunnerConfigBuilder for constructing runner configs */
@@ -336,7 +336,7 @@ export class ChatSessionHandler<TEvent> {
 	 * dedicated AgentSessionManager — they aren't reachable from
 	 * EdgeWorker's primary AgentSessionManager.
 	 */
-	getAllChatSessions(): CyrusAgentSession[] {
+	getAllChatSessions(): AgithaAgentSession[] {
 		return this.sessionManager.getAllSessions();
 	}
 
@@ -365,7 +365,7 @@ export class ChatSessionHandler<TEvent> {
 	 */
 	private async resumeSession(
 		event: TEvent,
-		existingSession: CyrusAgentSession,
+		existingSession: AgithaAgentSession,
 		sessionId: string,
 		resumeSessionId: string,
 		taskInstructions: string,
@@ -480,7 +480,7 @@ export class ChatSessionHandler<TEvent> {
 		try {
 			const sanitizedKey = threadKey.replace(/[^a-zA-Z0-9.-]/g, "_");
 			const workspacePath = join(
-				this.deps.cyrusHome,
+				this.deps.agithaHome,
 				`${this.adapter.platformName}-workspaces`,
 				sanitizedKey,
 			);
@@ -522,7 +522,7 @@ export class ChatSessionHandler<TEvent> {
 			systemPrompt,
 			sessionId,
 			resumeSessionId,
-			cyrusHome: this.deps.cyrusHome,
+			agithaHome: this.deps.agithaHome,
 			platformName: this.adapter.platformName,
 			linearWorkspaceId: provider.getDefaultLinearWorkspaceId(),
 			repository: provider.getDefaultRepository(),

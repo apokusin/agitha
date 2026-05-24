@@ -11,7 +11,7 @@ import {
 	type SDKResultMessage,
 	type SDKUserMessage,
 	StreamingPrompt,
-} from "cyrus-core";
+} from "agitha-core";
 import { extractSessionId, geminiEventToSDKMessage } from "./adapters.js";
 import { GeminiMessageFormatter } from "./formatter.js";
 import {
@@ -54,7 +54,7 @@ export declare interface GeminiRunner {
  * @example
  * ```typescript
  * const runner = new GeminiRunner({
- *   cyrusHome: '/home/user/.cyrus',
+ *   agithaHome: '/home/user/.agitha',
  *   workingDirectory: '/path/to/repo',
  *   model: 'gemini-2.5-flash',
  *   autoApprove: true
@@ -84,7 +84,7 @@ export class GeminiRunner extends EventEmitter implements IAgentRunner {
 	private readableLogStream: WriteStream | null = null;
 	private messages: SDKMessage[] = [];
 	private streamingPrompt: StreamingPrompt | null = null;
-	private cyrusHome: string;
+	private agithaHome: string;
 	// Delta message accumulation
 	private accumulatingMessage: SDKMessage | null = null;
 	private accumulatingRole: "user" | "assistant" | null = null;
@@ -104,11 +104,11 @@ export class GeminiRunner extends EventEmitter implements IAgentRunner {
 	constructor(config: GeminiRunnerConfig) {
 		super();
 		this.config = config;
-		this.cyrusHome = config.cyrusHome;
+		this.agithaHome = config.agithaHome;
 		// Use workspaceName for unique system prompt file paths (supports parallel execution)
 		const workspaceName = config.workspaceName || "default";
 		this.systemPromptManager = new SystemPromptManager(
-			config.cyrusHome,
+			config.agithaHome,
 			workspaceName,
 		);
 		// Use GeminiMessageFormatter for Gemini-specific tool names
@@ -806,7 +806,7 @@ export class GeminiRunner extends EventEmitter implements IAgentRunner {
 	 * Set up logging streams for this session
 	 */
 	private setupLogging(): void {
-		const logsDir = join(this.cyrusHome, "logs");
+		const logsDir = join(this.agithaHome, "logs");
 		const workspaceName =
 			this.config.workspaceName ||
 			(this.config.workingDirectory

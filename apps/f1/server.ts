@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 /**
- * F1 Server - Testing Framework Server for Cyrus
+ * F1 Server - Testing Framework Server for Agitha
  *
  * This server starts the EdgeWorker in CLI platform mode, providing
- * a complete testing environment for the Cyrus agent system without
+ * a complete testing environment for the Agitha agent system without
  * external dependencies.
  *
  * Features:
@@ -15,47 +15,47 @@
  * - Zero `any` types
  *
  * Usage:
- *   CYRUS_PORT=3600 CYRUS_REPO_PATH=/path/to/repo bun run server.ts
+ *   AGITHA_PORT=3600 AGITHA_REPO_PATH=/path/to/repo bun run server.ts
  */
 
 import { existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getAllTools } from "cyrus-claude-runner";
+import { getAllTools } from "agitha-claude-runner";
 import {
 	type EdgeWorkerConfig,
 	getDefaultReposDir,
 	getDefaultWorktreesDir,
 	type RepositoryConfig,
-} from "cyrus-core";
-import { EdgeWorker } from "cyrus-edge-worker";
-import type { SlackWebhookEvent } from "cyrus-slack-event-transport";
+} from "agitha-core";
+import { EdgeWorker } from "agitha-edge-worker";
+import type { SlackWebhookEvent } from "agitha-slack-event-transport";
 import { bold, cyan, dim, gray, green, success } from "./src/utils/colors.js";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const CYRUS_PORT = Number.parseInt(process.env.CYRUS_PORT || "3600", 10);
-const CYRUS_REPO_PATH = process.env.CYRUS_REPO_PATH || process.cwd();
-const CYRUS_HOME = join(tmpdir(), `cyrus-f1-${Date.now()}`);
-const DEFAULT_REPOS_BASE_DIR = getDefaultReposDir(CYRUS_HOME);
-const DEFAULT_WORKTREES_BASE_DIR = getDefaultWorktreesDir(CYRUS_HOME);
+const AGITHA_PORT = Number.parseInt(process.env.AGITHA_PORT || "3600", 10);
+const AGITHA_REPO_PATH = process.env.AGITHA_REPO_PATH || process.cwd();
+const AGITHA_HOME = join(tmpdir(), `agitha-f1-${Date.now()}`);
+const DEFAULT_REPOS_BASE_DIR = getDefaultReposDir(AGITHA_HOME);
+const DEFAULT_WORKTREES_BASE_DIR = getDefaultWorktreesDir(AGITHA_HOME);
 // Optional second repository path for multi-repo orchestration testing
-const CYRUS_REPO_PATH_2 = process.env.CYRUS_REPO_PATH_2;
-const MULTI_REPO_MODE = Boolean(CYRUS_REPO_PATH_2);
+const AGITHA_REPO_PATH_2 = process.env.AGITHA_REPO_PATH_2;
+const MULTI_REPO_MODE = Boolean(AGITHA_REPO_PATH_2);
 
 // Validate port
-if (Number.isNaN(CYRUS_PORT) || CYRUS_PORT < 1 || CYRUS_PORT > 65535) {
-	console.error(`❌ Invalid CYRUS_PORT: ${process.env.CYRUS_PORT}`);
+if (Number.isNaN(AGITHA_PORT) || AGITHA_PORT < 1 || AGITHA_PORT > 65535) {
+	console.error(`❌ Invalid AGITHA_PORT: ${process.env.AGITHA_PORT}`);
 	console.error("   Port must be between 1 and 65535");
 	process.exit(1);
 }
 
 // Validate repository path
-if (!existsSync(CYRUS_REPO_PATH)) {
-	console.error(`❌ Repository path does not exist: ${CYRUS_REPO_PATH}`);
-	console.error("   Set CYRUS_REPO_PATH to a valid directory");
+if (!existsSync(AGITHA_REPO_PATH)) {
+	console.error(`❌ Repository path does not exist: ${AGITHA_REPO_PATH}`);
+	console.error("   Set AGITHA_REPO_PATH to a valid directory");
 	process.exit(1);
 }
 
@@ -68,11 +68,11 @@ if (!existsSync(CYRUS_REPO_PATH)) {
  */
 function setupDirectories(): void {
 	const requiredDirs = [
-		CYRUS_HOME,
+		AGITHA_HOME,
 		DEFAULT_REPOS_BASE_DIR,
 		DEFAULT_WORKTREES_BASE_DIR,
-		join(CYRUS_HOME, "mcp-configs"),
-		join(CYRUS_HOME, "state"),
+		join(AGITHA_HOME, "mcp-configs"),
+		join(AGITHA_HOME, "state"),
 	];
 
 	for (const dir of requiredDirs) {
@@ -94,7 +94,7 @@ function createEdgeWorkerConfig(): EdgeWorkerConfig {
 	const repository: RepositoryConfig = {
 		id: "f1-test-repo",
 		name: "F1 Test Repository",
-		repositoryPath: CYRUS_REPO_PATH,
+		repositoryPath: AGITHA_REPO_PATH,
 		baseBranch: "main",
 		githubUrl: "https://github.com/f1-test/primary-repo",
 		linearWorkspaceId: "cli-workspace",
@@ -130,11 +130,11 @@ function createEdgeWorkerConfig(): EdgeWorkerConfig {
 	const repositories: RepositoryConfig[] = [repository];
 
 	// Add second repository if multi-repo mode is enabled
-	if (MULTI_REPO_MODE && CYRUS_REPO_PATH_2) {
+	if (MULTI_REPO_MODE && AGITHA_REPO_PATH_2) {
 		const secondaryRepository: RepositoryConfig = {
 			id: "f1-test-repo-secondary",
 			name: "F1 Secondary Repository",
-			repositoryPath: CYRUS_REPO_PATH_2,
+			repositoryPath: AGITHA_REPO_PATH_2,
 			baseBranch: "main",
 			githubUrl: "https://github.com/f1-test/secondary-repo",
 			linearWorkspaceId: "cli-workspace", // Same workspace for routing test
@@ -159,8 +159,8 @@ function createEdgeWorkerConfig(): EdgeWorkerConfig {
 	const config: EdgeWorkerConfig = {
 		platform: "cli" as const,
 		repositories,
-		cyrusHome: CYRUS_HOME,
-		serverPort: CYRUS_PORT,
+		agithaHome: AGITHA_HOME,
+		serverPort: AGITHA_PORT,
 		serverHost: "localhost",
 		claudeDefaultModel: "sonnet",
 		claudeDefaultFallbackModel: "haiku",
@@ -173,22 +173,22 @@ function createEdgeWorkerConfig(): EdgeWorkerConfig {
 				linearToken: "cli-mode-no-token-needed",
 			},
 		},
-		// Enable egress proxy sandbox when CYRUS_SANDBOX=1 is set.
+		// Enable egress proxy sandbox when AGITHA_SANDBOX=1 is set.
 		// The proxy only intercepts Bash-spawned subprocess traffic (git, gh, npm, etc.).
 		// Claude's inference API, MCP servers, and built-in file tools bypass the proxy.
 		//
 		// No networkPolicy = allow-all mode (passthrough with logging).
-		// To test deny-all + explicit allows with transforms, set CYRUS_SANDBOX_POLICY=1.
-		...(process.env.CYRUS_SANDBOX === "1" && {
+		// To test deny-all + explicit allows with transforms, set AGITHA_SANDBOX_POLICY=1.
+		...(process.env.AGITHA_SANDBOX === "1" && {
 			sandbox: {
 				enabled: true,
 				httpProxyPort: 19080,
 				socksProxyPort: 19081,
 				logRequests: true,
 				// User-defined policy: deny-all default, explicit allows with transforms.
-				// Only enabled with CYRUS_SANDBOX_POLICY=1 since F1 test repos lack
+				// Only enabled with AGITHA_SANDBOX_POLICY=1 since F1 test repos lack
 				// GitHub remotes and don't need network restrictions.
-				...(process.env.CYRUS_SANDBOX_POLICY === "1" && {
+				...(process.env.AGITHA_SANDBOX_POLICY === "1" && {
 					networkPolicy: {
 						allow: {
 							"github.com": [
@@ -196,7 +196,7 @@ function createEdgeWorkerConfig(): EdgeWorkerConfig {
 									transform: [
 										{
 											headers: {
-												"X-Cyrus-Egress": "verified",
+												"X-Agitha-Egress": "verified",
 											},
 										},
 									],
@@ -207,7 +207,7 @@ function createEdgeWorkerConfig(): EdgeWorkerConfig {
 									transform: [
 										{
 											headers: {
-												"X-Cyrus-Egress": "verified",
+												"X-Agitha-Egress": "verified",
 											},
 										},
 									],
@@ -241,17 +241,17 @@ function displayConnectionInfo(): void {
 	console.log(success("Server started successfully"));
 	console.log("");
 	console.log(
-		`  ${cyan("Server:")}    ${bold(`http://localhost:${CYRUS_PORT}`)}`,
+		`  ${cyan("Server:")}    ${bold(`http://localhost:${AGITHA_PORT}`)}`,
 	);
 	console.log(
-		`  ${cyan("RPC:")}       ${bold(`http://localhost:${CYRUS_PORT}/cli/rpc`)}`,
+		`  ${cyan("RPC:")}       ${bold(`http://localhost:${AGITHA_PORT}/cli/rpc`)}`,
 	);
 	console.log(`  ${cyan("Platform:")}  ${bold("cli")}`);
-	console.log(`  ${cyan("Cyrus Home:")} ${dim(CYRUS_HOME)}`);
-	console.log(`  ${cyan("Repository:")} ${dim(CYRUS_REPO_PATH)}`);
+	console.log(`  ${cyan("Agitha Home:")} ${dim(AGITHA_HOME)}`);
+	console.log(`  ${cyan("Repository:")} ${dim(AGITHA_REPO_PATH)}`);
 	if (MULTI_REPO_MODE) {
 		console.log(
-			`  ${cyan("Multi-Repo:")} ${bold("enabled")} (${dim(CYRUS_REPO_PATH_2 || "")})`,
+			`  ${cyan("Multi-Repo:")} ${bold("enabled")} (${dim(AGITHA_REPO_PATH_2 || "")})`,
 		);
 		console.log(
 			dim("  Routing context will be included in orchestrator prompts"),

@@ -21,8 +21,8 @@ import type {
 	AskUserQuestionResult,
 	IIssueTrackerService,
 	ILogger,
-} from "cyrus-core";
-import { AgentActivitySignal, createLogger } from "cyrus-core";
+} from "agitha-core";
+import { AgentActivitySignal, createLogger } from "agitha-core";
 
 /**
  * Pending question data stored while awaiting user response

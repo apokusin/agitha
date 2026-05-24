@@ -17,7 +17,7 @@ import type {
 	TranslationContext,
 	TranslationResult,
 	UserPromptMessage,
-} from "cyrus-core";
+} from "agitha-core";
 import type { SlackWebhookEvent } from "./types.js";
 
 /**

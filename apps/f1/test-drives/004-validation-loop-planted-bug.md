@@ -3,7 +3,7 @@
 **Date**: 2025-12-17
 **Goal**: Validate the validation loop implementation by forcing a controlled failure scenario
 **Scope**: Large - Testing full validation loop cycle (fail → fixer → retry → pass)
-**PR**: https://github.com/ceedaragents/cyrus/pull/666
+**PR**: https://github.com/apokusin/agitha/pull/666
 
 ---
 
@@ -83,7 +83,7 @@ The verification step will handle running all tests.
 
 **Command**:
 ```bash
-CYRUS_PORT=3602 CYRUS_REPO_PATH=/tmp/validation-fail-test pnpm run server
+AGITHA_PORT=3602 AGITHA_REPO_PATH=/tmp/validation-fail-test pnpm run server
 ```
 
 **Output**:

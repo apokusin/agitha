@@ -1,17 +1,17 @@
-# Cyrus
+# Agitha
 
 <div>
-  <a href="https://github.com/ceedaragents/cyrus/actions">
-    <img src="https://github.com/ceedaragents/cyrus/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://github.com/apokusin/agitha/actions">
+    <img src="https://github.com/apokusin/agitha/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
 
 </div>
 
 [![Discord](https://img.shields.io/discord/1443747721910685792?label=Discord&logo=discord&logoColor=white)](https://discord.gg/prrtADHYTt)
 
-Your (Claude Code|Codex|Cursor|Gemini) powered (Linear|GitHub|GitLab|Slack) agent. Cyrus monitors (Linear|GitHub|GitLab|Slack) issues assigned to it, creates isolated Git worktrees for each issue, runs (Claude Code|Codex|Cursor|Gemini) sessions to process them, and streams detailed agent activity updates back to (Linear|GitHub), along with rich interactions like dropdown selects and approvals.
+Your (Claude Code|Codex|Cursor|Gemini) powered (Linear|GitHub|GitLab|Slack) agent. Agitha monitors (Linear|GitHub|GitLab|Slack) issues assigned to it, creates isolated Git worktrees for each issue, runs (Claude Code|Codex|Cursor|Gemini) sessions to process them, and streams detailed agent activity updates back to (Linear|GitHub), along with rich interactions like dropdown selects and approvals.
 
-**Note:** Cyrus is a BYOK platform (bring your keys / subscriptions) for tokens.
+**Note:** Agitha is a BYOK platform (bring your keys / subscriptions) for tokens.
 
 ---
 
@@ -22,13 +22,13 @@ Your (Claude Code|Codex|Cursor|Gemini) powered (Linear|GitHub|GitLab|Slack) agen
 Zero cost option — host everything yourself with your own Linear OAuth app, GitHub App, and Slack App. An AI-guided setup skill handles the entire onboarding: installing dependencies, configuring auth, creating integration apps, and connecting repositories — so you don't have to follow a manual guide.
 
 ```bash
-npx skills add ceedaragents/cyrus -g
+npx skills add apokusin/agitha -g
 ```
 
 Then in any AI coding agent (Claude Code, Codex, Cursor, etc.):
 
 ```
-/cyrus-setup
+/agitha-setup
 ```
 
 Or follow the **[manual setup guide](./docs/SELF_HOSTING.md)** if you prefer.
@@ -37,31 +37,31 @@ Or follow the **[manual setup guide](./docs/SELF_HOSTING.md)** if you prefer.
 
 ### Pro & Team Plans
 
-Configure Cyrus through the dashboard at [app.atcyrus.com](https://app.atcyrus.com).
+Configure Agitha through the dashboard at [app.atagitha.com](https://app.atagitha.com).
 
 #### For paid self-hosted deployments
 
-It is called 'self-hosted' because it uses a machine you control as the agent runtime. Networking layer and integrations are provided by the Cyrus cloud provider.
+It is called 'self-hosted' because it uses a machine you control as the agent runtime. Networking layer and integrations are provided by the Agitha cloud provider.
 
 ```bash
-# Install Cyrus
-npm install -g cyrus-ai
+# Install Agitha
+npm install -g agitha-ai
 
 # Authenticate with your token (provided during onboarding)
-cyrus auth <your-token>
+agitha auth <your-token>
 ```
 
-For Cyrus to create pull requests or merge requests, configure Git and your hosting CLI. See **[Git & GitHub Setup](./docs/GIT_GITHUB.md)** or **[Git & GitLab Setup](./docs/GIT_GITLAB.md)**.
+For Agitha to create pull requests or merge requests, configure Git and your hosting CLI. See **[Git & GitHub Setup](./docs/GIT_GITHUB.md)** or **[Git & GitLab Setup](./docs/GIT_GITLAB.md)**.
 
-Keep Cyrus running as a persistent process:
+Keep Agitha running as a persistent process:
 
-- **tmux**: `tmux new -s cyrus` then run `cyrus` (Ctrl+B, D to detach)
-- **pm2**: `pm2 start cyrus --name cyrus`
+- **tmux**: `tmux new -s agitha` then run `agitha` (Ctrl+B, D to detach)
+- **pm2**: `pm2 start agitha --name agitha`
 - **systemd**: See [Running as a Service](./docs/SELF_HOSTING.md#running-as-a-service)
 
 #### For cloud-hosted deployments
 
-No installation required. Everything is managed through [app.atcyrus.com](https://app.atcyrus.com).
+No installation required. Everything is managed through [app.atagitha.com](https://app.atagitha.com).
 
 ---
 

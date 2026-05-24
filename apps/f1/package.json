@@ -1,8 +1,8 @@
 {
-	"name": "cyrus-f1",
+	"name": "agitha-f1",
 	"version": "0.1.0",
 	"type": "module",
-	"description": "F1 Testing Framework CLI for Cyrus",
+	"description": "F1 Testing Framework CLI for Agitha",
 	"main": "dist/src/cli.js",
 	"types": "dist/src/cli.d.ts",
 	"bin": {
@@ -32,10 +32,10 @@
 	},
 	"dependencies": {
 		"commander": "^14.0.2",
-		"cyrus-claude-runner": "workspace:*",
-		"cyrus-core": "workspace:*",
-		"cyrus-edge-worker": "workspace:*",
-		"cyrus-slack-event-transport": "workspace:*"
+		"agitha-claude-runner": "workspace:*",
+		"agitha-core": "workspace:*",
+		"agitha-edge-worker": "workspace:*",
+		"agitha-slack-event-transport": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",

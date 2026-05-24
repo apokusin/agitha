@@ -1,4 +1,4 @@
-import type { IMessageFormatter } from "cyrus-core";
+import type { IMessageFormatter } from "agitha-core";
 
 type ToolInput = Record<string, unknown>;
 

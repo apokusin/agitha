@@ -25,15 +25,15 @@ export const UserIdentifierSchema = z.union([
 export const UserAccessControlConfigSchema = z.object({
 	/**
 	 * Users allowed to delegate issues.
-	 * If specified, ONLY these users can trigger Cyrus sessions.
-	 * Empty array means no one is allowed (effectively disables Cyrus).
+	 * If specified, ONLY these users can trigger Agitha sessions.
+	 * Empty array means no one is allowed (effectively disables Agitha).
 	 * Omitting this field means everyone is allowed (unless blocked).
 	 */
 	allowedUsers: z.array(UserIdentifierSchema).optional(),
 
 	/**
 	 * Users blocked from delegating issues.
-	 * These users cannot trigger Cyrus sessions.
+	 * These users cannot trigger Agitha sessions.
 	 * Takes precedence over allowedUsers.
 	 */
 	blockedUsers: z.array(UserIdentifierSchema).optional(),
@@ -112,6 +112,77 @@ const PromptTypeDefaultsSchema = z.object({
 	allowedTools: ToolRestrictionSchema.optional(),
 	disallowedTools: z.array(z.string()).optional(),
 });
+
+/**
+ * Custom personality configuration.
+ *
+ * A custom personality is a user-defined agent role that pairs a set of
+ * labels with a system-prompt markdown file plus optional tool / model
+ * overrides. Custom personalities are matched before the built-in label
+ * prompt types (debugger, builder, scoper, orchestrator) and take
+ * precedence when their labels match.
+ *
+ * - `labels`: list of label names that trigger this personality (case-insensitive)
+ * - `promptPath`: path to the system-prompt markdown file. Supports `~/`
+ *   expansion and is resolved at config load time.
+ * - `allowedTools` / `disallowedTools`: optional tool overrides. If
+ *   `allowedTools` is set, it fully replaces the resolved tool list for
+ *   sessions handled by this personality (presets like `readOnly`,
+ *   `safe`, `all`, `coordinator` are supported).
+ * - `writeScopes`: optional workspace-relative glob patterns that scope
+ *   any unscoped `Write` or `Edit` entry in `allowedTools` to specific
+ *   directories.
+ * - `model`: optional model override for the runner (forwarded to the
+ *   selected runner's model field).
+ * - `description`: optional human-readable description shown in logs and
+ *   on the Linear timeline.
+ */
+const CustomPersonalityConfigSchema = z.object({
+	labels: z.array(z.string()),
+	promptPath: z.string(),
+	/**
+	 * When true, the personality matches only when *every* label in `labels`
+	 * is present on the issue (case-insensitive). Default false — any single
+	 * label match is enough. Use this to require label combinations like
+	 * `["Article", "Draft"]` without the personality firing for every
+	 * "Article" issue.
+	 */
+	requireAllLabels: z.boolean().optional(),
+	/**
+	 * Workspace-relative directories the personality should consult for
+	 * style, voice, and historical examples (a static "memory" surface). At
+	 * session start, the listed paths are injected into the personality's
+	 * system prompt as a `<reference_context>` block instructing the agent
+	 * to read them before producing work. The directories themselves still
+	 * need to be readable through the personality's `allowedTools` (e.g.
+	 * `Read` / `Glob` / `Grep` for a read-only or copy-writer personality).
+	 */
+	referenceDirs: z.array(z.string()).optional(),
+	allowedTools: ToolRestrictionSchema.optional(),
+	disallowedTools: z.array(z.string()).optional(),
+	/**
+	 * Workspace-relative glob patterns (e.g. `["./content/**", "./drafts/**"]`)
+	 * that scope any unscoped `Write` or `Edit` entry in `allowedTools`. When
+	 * set, a bare `"Write"` in `allowedTools` is replaced with one
+	 * `"Write(<scope>)"` entry per scope (same for `"Edit"`). Already-
+	 * parenthesized entries (e.g. `"Write(./other/**)"`) are passed through
+	 * unchanged. Has no effect when `allowedTools` is unset.
+	 */
+	writeScopes: z.array(z.string()).optional(),
+	model: z.string().optional(),
+	description: z.string().optional(),
+});
+
+/**
+ * Map of custom personality keys to their config. The key is the
+ * personality's internal name (e.g. `"reviewer"`, `"security-auditor"`)
+ * and is used in logs and as the personality identifier in
+ * `SystemPromptResult.customPersonalityKey`.
+ */
+const CustomPersonalitiesSchema = z.record(
+	z.string(),
+	CustomPersonalityConfigSchema,
+);
 
 /**
  * Header transform rule for egress proxy.
@@ -309,12 +380,19 @@ export const RepositoryConfigSchema = z.object({
 	// Label-based system prompt configuration
 	labelPrompts: LabelPromptsSchema.optional(),
 
+	/**
+	 * User-defined custom personalities for this repository. Checked
+	 * before the built-in `labelPrompts` matcher; first matching personality
+	 * wins. Keys are personality names; values are the config.
+	 */
+	customPersonalities: CustomPersonalitiesSchema.optional(),
+
 	// Repository-specific user access control
 	userAccessControl: UserAccessControlConfigSchema.optional(),
 });
 
 /**
- * Edge configuration - the serializable configuration stored in ~/.cyrus/config.json
+ * Edge configuration - the serializable configuration stored in ~/.agitha/config.json
  *
  * This schema defines all settings that can be persisted to disk.
  * It contains global settings that apply across all repositories,
@@ -401,7 +479,7 @@ export const EdgeConfigSchema = z.object({
 	/**
 	 * Allowed tools for Slack @mention chat sessions. When set, overrides the
 	 * built-in read-only chat tool set used by ToolPermissionResolver. The
-	 * workspace MCP tool prefixes (mcp__linear, mcp__cyrus-tools, etc.) are
+	 * workspace MCP tool prefixes (mcp__linear, mcp__agitha-tools, etc.) are
 	 * still appended automatically.
 	 */
 	slackAllowedTools: z.array(z.string()).optional(),
@@ -420,9 +498,9 @@ export const EdgeConfigSchema = z.object({
 	 * `repository.mcpConfigPath` is not consulted here — only this list
 	 * determines which custom `.mcp.json` files load for Slack. When
 	 * omitted/empty, no custom files load (native MCP servers — Linear,
-	 * Cyrus tools, Slack MCP, Cyrus docs — still run as usual).
+	 * Agitha tools, Slack MCP, Agitha docs — still run as usual).
 	 *
-	 * The per-platform lists let cyrus-hosted route custom MCP server
+	 * The per-platform lists let agitha-hosted route custom MCP server
 	 * availability per surface — e.g. expose `slack-mcp-server` only on
 	 * Slack, or scope a Supabase MCP to GitHub PR sessions but not Linear
 	 * issue work. Each entry is passed as-is to Claude Code's
@@ -466,6 +544,13 @@ export const EdgeConfigSchema = z.object({
 
 	/** Global defaults for prompt types (tool restrictions per prompt type) */
 	promptDefaults: PromptDefaultsSchema.optional(),
+
+	/**
+	 * Workspace-wide custom personalities, available to every repository.
+	 * Per-repository `customPersonalities` are checked first and take
+	 * precedence on key collisions.
+	 */
+	customPersonalities: CustomPersonalitiesSchema.optional(),
 
 	/**
 	 * Sandbox configuration for network egress control.
@@ -590,6 +675,10 @@ export type UserAccessControlConfig = z.infer<
 export type LinearWorkspaceConfig = z.infer<typeof LinearWorkspaceConfigSchema>;
 export type RepositoryConfig = z.infer<typeof RepositoryConfigSchema>;
 export type EdgeConfig = z.infer<typeof EdgeConfigSchema>;
+export type CustomPersonalityConfig = z.infer<
+	typeof CustomPersonalityConfigSchema
+>;
+export type CustomPersonalities = z.infer<typeof CustomPersonalitiesSchema>;
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type NetworkPolicy = z.infer<typeof NetworkPolicySchema>;
 export type RepositoryConfigPayload = z.infer<

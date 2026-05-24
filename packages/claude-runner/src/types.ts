@@ -14,9 +14,9 @@ import type {
 	SessionStore,
 	WarmQuery,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { ILogger, OnAskUserQuestion } from "cyrus-core";
+import type { ILogger, OnAskUserQuestion } from "agitha-core";
 
-export type { OnAskUserQuestion } from "cyrus-core";
+export type { OnAskUserQuestion } from "agitha-core";
 
 /**
  * Output format configuration for structured outputs
@@ -39,7 +39,7 @@ export interface ClaudeRunnerConfig {
 	fallbackModel?: string; // Fallback model if primary model is unavailable
 	maxTurns?: number; // Maximum number of turns before completing the session
 	tools?: string[]; // Built-in tools available in model context (empty array disables all tools)
-	cyrusHome: string; // Cyrus home directory
+	agithaHome: string; // Agitha home directory
 	logger?: ILogger; // Optional logger instance
 	promptVersions?: {
 		// Optional prompt template version information
@@ -85,7 +85,7 @@ export interface ClaudeRunnerConfig {
 	/**
 	 * Optional SessionStore that mirrors transcript entries to external storage.
 	 * Forwarded to the SDK's `query()` via `options.sessionStore`. Used to ship
-	 * session JSONL to the Cyrus hosted control plane so transcripts survive
+	 * session JSONL to the Agitha hosted control plane so transcripts survive
 	 * the ephemeral worktree and can be resumed from any host.
 	 */
 	sessionStore?: SessionStore;

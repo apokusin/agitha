@@ -15,8 +15,12 @@ import type {
 	Issue,
 	RepositoryConfig,
 	Workspace,
-} from "cyrus-core";
-import { createLogger, getDefaultWorktreesDir, type ILogger } from "cyrus-core";
+} from "agitha-core";
+import {
+	createLogger,
+	getDefaultWorktreesDir,
+	type ILogger,
+} from "agitha-core";
 import { WorktreeIncludeService } from "./WorktreeIncludeService.js";
 
 export interface CreateGitWorktreeOptions {
@@ -34,7 +38,7 @@ export interface CreateGitWorktreeOptions {
 }
 
 export interface GitServiceOptions {
-	cyrusHome?: string;
+	agithaHome?: string;
 }
 
 /**
@@ -43,12 +47,12 @@ export interface GitServiceOptions {
 export class GitService {
 	private logger: ILogger;
 	private worktreeIncludeService: WorktreeIncludeService;
-	private cyrusHome: string;
+	private agithaHome: string;
 
 	constructor(options?: GitServiceOptions, logger?: ILogger) {
 		this.logger = logger ?? createLogger({ component: "GitService" });
 		this.worktreeIncludeService = new WorktreeIncludeService(this.logger);
-		this.cyrusHome = options?.cyrusHome ?? join(homedir(), ".cyrus");
+		this.agithaHome = options?.agithaHome ?? join(homedir(), ".agitha");
 	}
 
 	/**
@@ -651,7 +655,7 @@ export class GitService {
 				});
 
 				// Use exact line match to avoid substring false positives
-				// (e.g., "/path/CYSV-56" matching "/path/CYSV-56/cyrus")
+				// (e.g., "/path/CYSV-56" matching "/path/CYSV-56/agitha")
 				const worktreeLines = worktrees
 					.split("\n")
 					.filter((line) => line.startsWith("worktree "))
@@ -883,7 +887,7 @@ export class GitService {
 	 */
 	deleteWorktree(issueIdentifier: string): void {
 		const workspacePath = join(
-			getDefaultWorktreesDir(this.cyrusHome),
+			getDefaultWorktreesDir(this.agithaHome),
 			issueIdentifier,
 		);
 
@@ -1030,7 +1034,7 @@ export class GitService {
 	}
 
 	/**
-	 * Find and run a repository-specific setup script (cyrus-setup.sh/.ps1/.cmd/.bat)
+	 * Find and run a repository-specific setup script (agitha-setup.sh/.ps1/.cmd/.bat)
 	 */
 	private async runRepoSetupScript(
 		repositoryPath: string,
@@ -1040,19 +1044,19 @@ export class GitService {
 		const isWindows = process.platform === "win32";
 		const setupScripts = [
 			{
-				file: "cyrus-setup.sh",
+				file: "agitha-setup.sh",
 				platform: "unix",
 			},
 			{
-				file: "cyrus-setup.ps1",
+				file: "agitha-setup.ps1",
 				platform: "windows",
 			},
 			{
-				file: "cyrus-setup.cmd",
+				file: "agitha-setup.cmd",
 				platform: "windows",
 			},
 			{
-				file: "cyrus-setup.bat",
+				file: "agitha-setup.bat",
 				platform: "windows",
 			},
 		];

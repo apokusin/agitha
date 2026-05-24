@@ -1,4 +1,4 @@
-import type { SlackSessionStartPlatformData } from "cyrus-core";
+import type { SlackSessionStartPlatformData } from "agitha-core";
 import { describe, expect, it } from "vitest";
 import {
 	SlackMessageTranslator,

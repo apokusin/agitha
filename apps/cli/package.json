@@ -1,11 +1,11 @@
 {
-	"name": "cyrus-ai",
+	"name": "agitha-ai",
 	"version": "0.2.57",
 	"description": "AI-powered Linear issue automation using Claude",
 	"main": "dist/src/app.js",
 	"types": "dist/src/app.d.ts",
 	"bin": {
-		"cyrus": "./dist/src/app.js"
+		"agitha": "./dist/src/app.js"
 	},
 	"type": "module",
 	"scripts": {
@@ -27,7 +27,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/ceedaragents/cyrus.git",
+		"url": "https://github.com/apokusin/agitha.git",
 		"directory": "apps/cli"
 	},
 	"keywords": [
@@ -43,12 +43,12 @@
 		"@linear/sdk": "^64.0.0",
 		"@sentry/node": "^9.47.1",
 		"commander": "^14.0.2",
-		"cyrus-claude-runner": "workspace:*",
-		"cyrus-cloudflare-tunnel-client": "workspace:*",
-		"cyrus-config-updater": "workspace:*",
-		"cyrus-core": "workspace:*",
-		"cyrus-edge-worker": "workspace:*",
-		"cyrus-slack-event-transport": "workspace:*",
+		"agitha-claude-runner": "workspace:*",
+		"agitha-cloudflare-tunnel-client": "workspace:*",
+		"agitha-config-updater": "workspace:*",
+		"agitha-core": "workspace:*",
+		"agitha-edge-worker": "workspace:*",
+		"agitha-slack-event-transport": "workspace:*",
 		"dotenv": "^16.5.0",
 		"express": "^5.2.0",
 		"fastify": "^5.8.5",

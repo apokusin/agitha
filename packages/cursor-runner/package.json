@@ -1,7 +1,7 @@
 {
-	"name": "cyrus-cursor-runner",
+	"name": "agitha-cursor-runner",
 	"version": "0.2.57",
-	"description": "Cursor Agent CLI process wrapper for Cyrus",
+	"description": "Cursor Agent CLI process wrapper for Agitha",
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -17,8 +17,8 @@
 	},
 	"dependencies": {
 		"@cursor/sdk": "^1.0.11",
-		"cyrus-core": "workspace:*",
-		"cyrus-simple-agent-runner": "workspace:*"
+		"agitha-core": "workspace:*",
+		"agitha-simple-agent-runner": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",

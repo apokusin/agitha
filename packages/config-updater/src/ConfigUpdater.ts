@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
+import { handleAgithaConfig } from "./handlers/agithaConfig.js";
+import { handleAgithaEnv } from "./handlers/agithaEnv.js";
 import { handleCheckGh } from "./handlers/checkGh.js";
 import { handleCheckGlab } from "./handlers/checkGlab.js";
 import { handleConfigureMcp } from "./handlers/configureMcp.js";
-import { handleCyrusConfig } from "./handlers/cyrusConfig.js";
-import { handleCyrusEnv } from "./handlers/cyrusEnv.js";
 import {
 	handleRepository,
 	handleRepositoryDelete,
@@ -15,12 +15,12 @@ import {
 } from "./handlers/skills.js";
 import { handleTestMcp } from "./handlers/testMcp.js";
 import type {
+	AgithaConfigPayload,
+	AgithaEnvPayload,
 	ApiResponse,
 	CheckGhPayload,
 	CheckGlabPayload,
 	ConfigureMcpPayload,
-	CyrusConfigPayload,
-	CyrusEnvPayload,
 	DeleteRepositoryPayload,
 	DeleteSkillPayload,
 	ListSkillsPayload,
@@ -31,24 +31,24 @@ import type {
 
 /**
  * ConfigUpdater registers configuration update routes with a Fastify server
- * Handles: cyrus-config, cyrus-env, repository, update/test-mcp, update/configure-mcp, check-gh endpoints
+ * Handles: agitha-config, agitha-env, repository, update/test-mcp, update/configure-mcp, check-gh endpoints
  *
  * `getApiKey` is invoked on every auth check, so callers reading from
- * `process.env.CYRUS_API_KEY` pick up `.env` reloads (triggered by
- * `cyrus auth` after a credential rotation) without restarting the process.
+ * `process.env.AGITHA_API_KEY` pick up `.env` reloads (triggered by
+ * `agitha auth` after a credential rotation) without restarting the process.
  */
 export class ConfigUpdater {
 	private fastify: FastifyInstance;
-	private cyrusHome: string;
+	private agithaHome: string;
 	private getApiKey: () => string;
 
 	constructor(
 		fastify: FastifyInstance,
-		cyrusHome: string,
+		agithaHome: string,
 		getApiKey: () => string,
 	) {
 		this.fastify = fastify;
-		this.cyrusHome = cyrusHome;
+		this.agithaHome = agithaHome;
 		this.getApiKey = getApiKey;
 	}
 
@@ -57,8 +57,11 @@ export class ConfigUpdater {
 	 */
 	register(): void {
 		// Register all routes with authentication
-		this.registerRoute("/api/update/cyrus-config", this.handleCyrusConfigRoute);
-		this.registerRoute("/api/update/cyrus-env", this.handleCyrusEnvRoute);
+		this.registerRoute(
+			"/api/update/agitha-config",
+			this.handleAgithaConfigRoute,
+		);
+		this.registerRoute("/api/update/agitha-env", this.handleAgithaEnvRoute);
 		this.registerRoute("/api/update/repository", this.handleRepositoryRoute);
 		this.registerDeleteRoute(
 			"/api/update/repository",
@@ -183,32 +186,32 @@ export class ConfigUpdater {
 	}
 
 	/**
-	 * Handle cyrus-config update
+	 * Handle agitha-config update
 	 */
-	private async handleCyrusConfigRoute(
-		payload: CyrusConfigPayload,
+	private async handleAgithaConfigRoute(
+		payload: AgithaConfigPayload,
 	): Promise<ApiResponse> {
-		const response = await handleCyrusConfig(payload, this.cyrusHome);
+		const response = await handleAgithaConfig(payload, this.agithaHome);
 
 		// Emit restart event if requested
-		if (response.success && response.data?.restartCyrus) {
-			this.fastify.log.info("Config update requested Cyrus restart");
+		if (response.success && response.data?.restartAgitha) {
+			this.fastify.log.info("Config update requested Agitha restart");
 		}
 
 		return response;
 	}
 
 	/**
-	 * Handle cyrus-env update
+	 * Handle agitha-env update
 	 */
-	private async handleCyrusEnvRoute(
-		payload: CyrusEnvPayload,
+	private async handleAgithaEnvRoute(
+		payload: AgithaEnvPayload,
 	): Promise<ApiResponse> {
-		const response = await handleCyrusEnv(payload, this.cyrusHome);
+		const response = await handleAgithaEnv(payload, this.agithaHome);
 
 		// Emit restart event if requested
-		if (response.success && response.data?.restartCyrus) {
-			this.fastify.log.info("Env update requested Cyrus restart");
+		if (response.success && response.data?.restartAgitha) {
+			this.fastify.log.info("Env update requested Agitha restart");
 		}
 
 		return response;
@@ -220,7 +223,7 @@ export class ConfigUpdater {
 	private async handleRepositoryRoute(
 		payload: RepositoryPayload,
 	): Promise<ApiResponse> {
-		return handleRepository(payload, this.cyrusHome);
+		return handleRepository(payload, this.agithaHome);
 	}
 
 	/**
@@ -238,7 +241,7 @@ export class ConfigUpdater {
 	private async handleConfigureMcpRoute(
 		payload: ConfigureMcpPayload,
 	): Promise<ApiResponse> {
-		return handleConfigureMcp(payload, this.cyrusHome);
+		return handleConfigureMcp(payload, this.agithaHome);
 	}
 
 	/**
@@ -247,7 +250,7 @@ export class ConfigUpdater {
 	private async handleCheckGhRoute(
 		payload: CheckGhPayload,
 	): Promise<ApiResponse> {
-		return handleCheckGh(payload, this.cyrusHome);
+		return handleCheckGh(payload, this.agithaHome);
 	}
 
 	/**
@@ -256,7 +259,7 @@ export class ConfigUpdater {
 	private async handleCheckGlabRoute(
 		payload: CheckGlabPayload,
 	): Promise<ApiResponse> {
-		return handleCheckGlab(payload, this.cyrusHome);
+		return handleCheckGlab(payload, this.agithaHome);
 	}
 
 	/**
@@ -265,7 +268,7 @@ export class ConfigUpdater {
 	private async handleRepositoryDeleteRoute(
 		payload: DeleteRepositoryPayload,
 	): Promise<ApiResponse> {
-		return handleRepositoryDelete(payload, this.cyrusHome);
+		return handleRepositoryDelete(payload, this.agithaHome);
 	}
 
 	/**
@@ -274,7 +277,7 @@ export class ConfigUpdater {
 	private async handleUpdateSkillRoute(
 		payload: UpdateSkillPayload,
 	): Promise<ApiResponse> {
-		return handleUpdateSkill(payload, this.cyrusHome);
+		return handleUpdateSkill(payload, this.agithaHome);
 	}
 
 	/**
@@ -283,7 +286,7 @@ export class ConfigUpdater {
 	private async handleDeleteSkillRoute(
 		payload: DeleteSkillPayload,
 	): Promise<ApiResponse> {
-		return handleDeleteSkill(payload, this.cyrusHome);
+		return handleDeleteSkill(payload, this.agithaHome);
 	}
 
 	/**
@@ -292,6 +295,6 @@ export class ConfigUpdater {
 	private async handleListSkillsRoute(
 		payload: ListSkillsPayload,
 	): Promise<ApiResponse> {
-		return handleListSkills(payload, this.cyrusHome);
+		return handleListSkills(payload, this.agithaHome);
 	}
 }

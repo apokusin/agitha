@@ -4,11 +4,11 @@ import type { ApiResponse, ConfigureMcpPayload } from "../types.js";
 
 /**
  * Handle MCP server configuration
- * Writes individual MCP config files to ~/.cyrus/mcp-{slug}.json
+ * Writes individual MCP config files to ~/.agitha/mcp-{slug}.json
  */
 export async function handleConfigureMcp(
 	payload: ConfigureMcpPayload,
-	cyrusHome: string,
+	agithaHome: string,
 ): Promise<ApiResponse> {
 	try {
 		// Validate payload
@@ -31,7 +31,7 @@ export async function handleConfigureMcp(
 		}
 
 		// Ensure the mcp-configs subdirectory exists
-		const mcpConfigsDir = join(cyrusHome, "mcp-configs");
+		const mcpConfigsDir = join(agithaHome, "mcp-configs");
 		if (!existsSync(mcpConfigsDir)) {
 			mkdirSync(mcpConfigsDir, { recursive: true });
 		}

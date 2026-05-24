@@ -1,5 +1,5 @@
 import { LinearClient } from "@linear/sdk";
-import type { EdgeWorkerConfig } from "cyrus-core";
+import type { EdgeWorkerConfig } from "agitha-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EdgeWorker } from "../src/EdgeWorker.js";
 
@@ -72,7 +72,7 @@ describe("EdgeWorker LinearClient Wrapper", () => {
 					linearWorkspaceName: "Test Workspace",
 				},
 			},
-			cyrusHome: "/test/.cyrus",
+			agithaHome: "/test/.agitha",
 			serverPort: 3456,
 			serverHost: "localhost",
 		};

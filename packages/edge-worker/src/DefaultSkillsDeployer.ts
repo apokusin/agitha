@@ -1,13 +1,13 @@
 import { access, cp, mkdir, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ILogger } from "cyrus-core";
+import type { ILogger } from "agitha-core";
 
 /**
- * Deploys bundled default skills to the cyrusHome directory.
+ * Deploys bundled default skills to the agithaHome directory.
  *
  * On first startup, copies all bundled skill directories from the package
- * into `~/.cyrus/cyrus-skills-plugin/skills/` so that users can inspect
+ * into `~/.agitha/agitha-skills-plugin/skills/` so that users can inspect
  * and customize them. Subsequent startups skip the copy if the plugin
  * directory already exists.
  *
@@ -22,7 +22,7 @@ export class DefaultSkillsDeployer {
 	private readonly manifestPath: string;
 
 	constructor(
-		private readonly cyrusHome: string,
+		private readonly agithaHome: string,
 		private readonly logger: ILogger,
 		bundledSkillsDir?: string,
 	) {
@@ -32,19 +32,19 @@ export class DefaultSkillsDeployer {
 			bundledSkillsDir ??
 			join(
 				dirname(fileURLToPath(import.meta.url)),
-				"cyrus-skills-plugin",
+				"agitha-skills-plugin",
 				"skills",
 			);
-		this.deployedPluginPath = join(this.cyrusHome, "cyrus-skills-plugin");
+		this.deployedPluginPath = join(this.agithaHome, "agitha-skills-plugin");
 		this.deployedSkillsPath = join(this.deployedPluginPath, "skills");
 		this.manifestDir = join(this.deployedPluginPath, ".claude-plugin");
 		this.manifestPath = join(this.manifestDir, "plugin.json");
 	}
 
 	/**
-	 * Ensure default skills are deployed to cyrusHome.
+	 * Ensure default skills are deployed to agithaHome.
 	 *
-	 * If `~/.cyrus/cyrus-skills-plugin/` does not exist, creates it and
+	 * If `~/.agitha/agitha-skills-plugin/` does not exist, creates it and
 	 * copies all bundled skills into it. If it already exists, does nothing
 	 * — the user may have customized the skills.
 	 */
@@ -72,8 +72,8 @@ export class DefaultSkillsDeployer {
 			this.manifestPath,
 			JSON.stringify(
 				{
-					name: "cyrus-skills",
-					description: "Default Cyrus workflow skills for agent sessions",
+					name: "agitha-skills",
+					description: "Default Agitha workflow skills for agent sessions",
 				},
 				null,
 				"\t",

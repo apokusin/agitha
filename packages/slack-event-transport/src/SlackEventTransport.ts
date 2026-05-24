@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { EventEmitter } from "node:events";
-import type { TranslationContext } from "cyrus-core";
-import { createLogger, type ILogger } from "cyrus-core";
+import type { TranslationContext } from "agitha-core";
+import { createLogger, type ILogger } from "agitha-core";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { SlackMessageTranslator } from "./SlackMessageTranslator.js";
 import type {
@@ -70,7 +70,7 @@ export class SlackEventTransport extends EventEmitter {
 	/**
 	 * Resolve the effective verification mode and secret at request time.
 	 * When started in proxy mode, checks if SLACK_SIGNING_SECRET and
-	 * CYRUS_HOST_EXTERNAL have been added to the environment since startup,
+	 * AGITHA_HOST_EXTERNAL have been added to the environment since startup,
 	 * enabling a runtime switch to direct verification.
 	 *
 	 * Encapsulates all mode-switch detection and logging so callers only
@@ -87,7 +87,7 @@ export class SlackEventTransport extends EventEmitter {
 
 		// Check if direct mode env vars have been added at runtime
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 		const slackSigningSecret = process.env.SLACK_SIGNING_SECRET;
 		const hasSlackSigningSecret =
 			slackSigningSecret != null && slackSigningSecret !== "";

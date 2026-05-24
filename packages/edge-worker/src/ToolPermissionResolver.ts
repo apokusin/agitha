@@ -2,13 +2,18 @@ import {
 	getAllTools,
 	getCoordinatorTools,
 	getSafeTools,
-} from "cyrus-claude-runner";
-import type { EdgeWorkerConfig, ILogger, RepositoryConfig } from "cyrus-core";
+} from "agitha-claude-runner";
+import type {
+	CustomPersonalityConfig,
+	EdgeWorkerConfig,
+	ILogger,
+	RepositoryConfig,
+} from "agitha-core";
 import {
 	GITHUB_DEFAULT_ALLOWED_TOOLS,
 	LINEAR_DEFAULT_ALLOWED_TOOLS,
 	SLACK_DEFAULT_ALLOWED_TOOLS,
-} from "cyrus-core";
+} from "agitha-core";
 
 /** Prompt type used for label-based tool/prompt selection */
 export type PromptType =
@@ -23,10 +28,10 @@ export type PromptType =
  * sessions.
  *
  * The resolver is **additive only**: it never appends or strips tools after
- * the explicit list is chosen. The per-platform defaults live in cyrus-core
+ * the explicit list is chosen. The per-platform defaults live in agitha-core
  * (`LINEAR_DEFAULT_ALLOWED_TOOLS`, `SLACK_DEFAULT_ALLOWED_TOOLS`,
  * `GITHUB_DEFAULT_ALLOWED_TOOLS`) and include workspace MCP prefixes
- * (`mcp__linear`, `mcp__cyrus-tools`, etc.) explicitly. Callers that want a
+ * (`mcp__linear`, `mcp__agitha-tools`, etc.) explicitly. Callers that want a
  * tighter list pass `linearAllowedTools` / `slackAllowedTools` /
  * `githubAllowedTools` on `EdgeWorkerConfig`, or set repo-level
  * `allowedTools`. The repo override is a verbatim replacement, not an
@@ -74,6 +79,35 @@ export class ToolPermissionResolver {
 	}
 
 	/**
+	 * Expand bare `Write` / `Edit` entries into per-scope variants.
+	 *
+	 * For each entry in `tools` exactly equal to `"Write"` or `"Edit"`, drop
+	 * it and append one `"<tool>(<scope>)"` entry per scope. Entries that are
+	 * already parenthesized (e.g. `"Write(./other/**)"`) — anything
+	 * containing `(` — pass through verbatim. Insertion order is preserved
+	 * for everything else.
+	 *
+	 * When `writeScopes` is undefined or empty the input is returned as-is.
+	 */
+	private applyWriteScopes(tools: string[], writeScopes?: string[]): string[] {
+		if (!writeScopes || writeScopes.length === 0) {
+			return tools;
+		}
+
+		const expanded: string[] = [];
+		for (const tool of tools) {
+			if (tool === "Write" || tool === "Edit") {
+				for (const scope of writeScopes) {
+					expanded.push(`${tool}(${scope})`);
+				}
+			} else {
+				expanded.push(tool);
+			}
+		}
+		return expanded;
+	}
+
+	/**
 	 * Build allowed tools for Slack chat sessions.
 	 *
 	 * Returns the team-configured `slackAllowedTools` if set, otherwise the
@@ -118,11 +152,21 @@ export class ToolPermissionResolver {
 	 * resolved list (per-repo presets resolved first, then unioned). When no
 	 * repos are passed, falls back to the workspace `linearAllowedTools`
 	 * (or the Linear platform default when neither is set).
+	 *
+	 * When `customPersonality` is provided and declares `allowedTools`, that
+	 * list (preset-resolved) replaces all per-repo resolution — custom
+	 * personalities are an explicit, self-contained tool surface.
 	 */
 	public buildAllowedTools(
 		repositories: RepositoryConfig | RepositoryConfig[],
 		promptType?: PromptType,
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
+		if (customPersonality?.allowedTools !== undefined) {
+			const resolved = this.resolveToolPreset(customPersonality.allowedTools);
+			return this.applyWriteScopes(resolved, customPersonality.writeScopes);
+		}
+
 		const repoArray = Array.isArray(repositories)
 			? repositories
 			: [repositories];
@@ -160,6 +204,7 @@ export class ToolPermissionResolver {
 	public buildGithubAllowedTools(
 		repository: RepositoryConfig,
 		promptType?: PromptType,
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
 		const platformDefault =
 			this.config.githubAllowedTools &&
@@ -170,7 +215,7 @@ export class ToolPermissionResolver {
 		const originalDefault = this.config.linearAllowedTools;
 		this.config.linearAllowedTools = platformDefault;
 		try {
-			return this.buildAllowedTools(repository, promptType);
+			return this.buildAllowedTools(repository, promptType, customPersonality);
 		} finally {
 			this.config.linearAllowedTools = originalDefault;
 		}
@@ -233,7 +278,12 @@ export class ToolPermissionResolver {
 	public buildDisallowedTools(
 		repositories: RepositoryConfig | RepositoryConfig[],
 		promptType?: PromptType,
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
+		if (customPersonality?.disallowedTools !== undefined) {
+			return [...customPersonality.disallowedTools];
+		}
+
 		const repoArray = Array.isArray(repositories)
 			? repositories
 			: [repositories];

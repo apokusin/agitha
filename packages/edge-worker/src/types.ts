@@ -1,5 +1,5 @@
-import type { SDKMessage } from "cyrus-claude-runner";
-import type { CyrusAgentSession, Issue, Workspace } from "cyrus-core";
+import type { SDKMessage } from "agitha-claude-runner";
+import type { AgithaAgentSession, Issue, Workspace } from "agitha-core";
 
 /**
  * Events emitted by EdgeWorker
@@ -47,7 +47,7 @@ export interface EdgeWorkerEvents {
  * Data returned from createAgentSession
  */
 export interface AgentSessionData {
-	session: CyrusAgentSession;
+	session: AgithaAgentSession;
 	fullIssue: Issue;
 	workspace: Workspace;
 	attachmentResult: { manifest: string; attachmentsDir: string | null };
