@@ -227,6 +227,8 @@ export class ConfigManager extends EventEmitter {
 				defaultRunner: parsedConfig.defaultRunner || this.config.defaultRunner,
 				promptDefaults:
 					parsedConfig.promptDefaults || this.config.promptDefaults,
+				customPersonalities:
+					parsedConfig.customPersonalities || this.config.customPersonalities,
 				// Preserve legacy fields while rolling out new config keys.
 				defaultModel: parsedConfig.defaultModel || this.config.defaultModel,
 				defaultFallbackModel:
@@ -346,6 +348,7 @@ export class ConfigManager extends EventEmitter {
 			"githubMcpConfigs",
 			"defaultDisallowedTools",
 			"promptDefaults",
+			"customPersonalities",
 			"issueUpdateTrigger",
 			"linearWorkspaces",
 			"userAccessControl",

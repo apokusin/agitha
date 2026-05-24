@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import {
 	type BaseBranchResolution,
 	type Comment,
+	type CustomPersonalities,
+	type CustomPersonalityConfig,
 	type GuidanceRule,
 	type IIssueTrackerService,
 	type ILogger,
@@ -24,6 +26,26 @@ export interface PromptBuilderDeps {
 	repositories: Map<string, RepositoryConfig>;
 	issueTrackers: Map<string, IIssueTrackerService>;
 	gitService: GitService;
+	/**
+	 * Returns workspace-wide custom personalities from the live config.
+	 * Called lazily on each match attempt so hot-reloaded config is picked up.
+	 */
+	getWorkspaceCustomPersonalities?: () => CustomPersonalities | undefined;
+}
+
+/**
+ * A custom personality match — returned inline on `SystemPromptResult`
+ * when a user-defined personality wins over the built-in matchers.
+ */
+export interface CustomPersonalityMatch {
+	/** Personality key (the map key under `customPersonalities`) */
+	key: string;
+	/** Source of the match (per-repo vs workspace-wide), useful for logs */
+	source: "repository" | "workspace";
+	/** Repository the match was anchored to (when source is "repository") */
+	repositoryId?: string;
+	/** The personality config that produced the match */
+	config: CustomPersonalityConfig;
 }
 
 /**
@@ -32,12 +54,22 @@ export interface PromptBuilderDeps {
 export interface SystemPromptResult {
 	prompt: string;
 	version?: string;
+	/**
+	 * Built-in prompt type, when a built-in matcher won. `undefined` when a
+	 * custom personality (see `customPersonality`) won.
+	 */
 	type?:
 		| "debugger"
 		| "builder"
 		| "scoper"
 		| "orchestrator"
 		| "graphite-orchestrator";
+	/**
+	 * Set when a user-defined custom personality matched the issue labels.
+	 * Callers should pass `customPersonality.config` to the tool resolver
+	 * and runner builder to apply its tool / model overrides.
+	 */
+	customPersonality?: CustomPersonalityMatch;
 }
 
 /**
@@ -60,12 +92,16 @@ export class PromptBuilder {
 	private readonly repositories: Map<string, RepositoryConfig>;
 	private readonly issueTrackers: Map<string, IIssueTrackerService>;
 	private readonly gitService: GitService;
+	private readonly getWorkspaceCustomPersonalities?: () =>
+		| CustomPersonalities
+		| undefined;
 
 	constructor(deps: PromptBuilderDeps) {
 		this.logger = deps.logger;
 		this.repositories = deps.repositories;
 		this.issueTrackers = deps.issueTrackers;
 		this.gitService = deps.gitService;
+		this.getWorkspaceCustomPersonalities = deps.getWorkspaceCustomPersonalities;
 	}
 
 	// ========================================================================
@@ -88,6 +124,18 @@ export class PromptBuilder {
 		}
 
 		const lowercaseLabels = labels.map((label) => label.toLowerCase());
+
+		// PRIORITY 1: User-defined custom personalities (per-repo, then workspace).
+		// These intentionally run before the built-in matchers so users can shadow
+		// the defaults with their own prompts.
+		const customMatch = await this.matchCustomPersonality(
+			lowercaseLabels,
+			labels,
+			repositories,
+		);
+		if (customMatch) {
+			return customMatch;
+		}
 
 		// HARDCODED RULE: Always check for 'orchestrator' label (case-insensitive)
 		// regardless of whether any repository.labelPrompts is configured.
@@ -169,6 +217,121 @@ export class PromptBuilder {
 		}
 
 		return winningResult;
+	}
+
+	/**
+	 * Match a user-defined custom personality against the issue labels.
+	 *
+	 * Resolution order:
+	 *   1. Per-repository `customPersonalities` (in repo array order; first
+	 *      repo whose personality matches wins)
+	 *   2. Workspace-wide `customPersonalities` from EdgeWorkerConfig
+	 *
+	 * Within a single map, entries are iterated in insertion order; the
+	 * first personality whose labels list intersects the issue labels wins.
+	 *
+	 * Returns `undefined` if no custom personality matched.
+	 */
+	private async matchCustomPersonality(
+		lowercaseLabels: string[],
+		labels: string[],
+		repositories: RepositoryConfig[],
+	): Promise<SystemPromptResult | undefined> {
+		// 1. Per-repository personalities — first repo / first matching key wins.
+		for (const repository of repositories) {
+			const personalities = repository.customPersonalities;
+			if (!personalities) continue;
+
+			for (const [key, config] of Object.entries(personalities)) {
+				if (this.labelsMatchPersonality(lowercaseLabels, config.labels)) {
+					const loaded = await this.loadCustomPersonalityPrompt(
+						key,
+						config,
+						labels,
+						"repository",
+						repository.id,
+					);
+					if (loaded) return loaded;
+				}
+			}
+		}
+
+		// 2. Workspace-wide personalities — only consulted if no per-repo match.
+		const workspacePersonalities = this.getWorkspaceCustomPersonalities?.();
+		if (workspacePersonalities) {
+			for (const [key, config] of Object.entries(workspacePersonalities)) {
+				if (this.labelsMatchPersonality(lowercaseLabels, config.labels)) {
+					const loaded = await this.loadCustomPersonalityPrompt(
+						key,
+						config,
+						labels,
+						"workspace",
+					);
+					if (loaded) return loaded;
+				}
+			}
+		}
+
+		return undefined;
+	}
+
+	/**
+	 * Returns true when at least one of the personality's configured labels
+	 * (case-insensitive) appears in the issue's labels.
+	 */
+	private labelsMatchPersonality(
+		lowercaseIssueLabels: string[],
+		personalityLabels: string[],
+	): boolean {
+		return personalityLabels.some((label) =>
+			lowercaseIssueLabels.includes(label.toLowerCase()),
+		);
+	}
+
+	/**
+	 * Load the markdown file for a custom personality and build the result.
+	 * Returns `undefined` (and logs) if the file cannot be read; callers
+	 * should fall through to the next personality / built-in matcher.
+	 */
+	private async loadCustomPersonalityPrompt(
+		key: string,
+		config: CustomPersonalityConfig,
+		originalLabels: string[],
+		source: "repository" | "workspace",
+		repositoryId?: string,
+	): Promise<SystemPromptResult | undefined> {
+		try {
+			const promptContent = await readFile(config.promptPath, "utf-8");
+			const version = this.extractVersionTag(promptContent);
+
+			this.logger.debug(
+				`Using custom personality '${key}' (${source}${
+					repositoryId ? `:${repositoryId}` : ""
+				}) for labels: ${originalLabels.join(", ")}`,
+			);
+			if (version) {
+				this.logger.debug(
+					`Custom personality '${key}' prompt version: ${version}`,
+				);
+			}
+
+			return {
+				prompt: promptContent,
+				version,
+				customPersonality: {
+					key,
+					source,
+					repositoryId,
+					config,
+				},
+			};
+		} catch (error) {
+			this.logger.error(
+				`Failed to load custom personality '${key}' prompt at ${config.promptPath}:`,
+				error,
+			);
+			return undefined;
+		}
 	}
 
 	/**

@@ -114,6 +114,47 @@ const PromptTypeDefaultsSchema = z.object({
 });
 
 /**
+ * Custom personality configuration.
+ *
+ * A custom personality is a user-defined agent role that pairs a set of
+ * labels with a system-prompt markdown file plus optional tool / model
+ * overrides. Custom personalities are matched before the built-in label
+ * prompt types (debugger, builder, scoper, orchestrator) and take
+ * precedence when their labels match.
+ *
+ * - `labels`: list of label names that trigger this personality (case-insensitive)
+ * - `promptPath`: path to the system-prompt markdown file. Supports `~/`
+ *   expansion and is resolved at config load time.
+ * - `allowedTools` / `disallowedTools`: optional tool overrides. If
+ *   `allowedTools` is set, it fully replaces the resolved tool list for
+ *   sessions handled by this personality (presets like `readOnly`,
+ *   `safe`, `all`, `coordinator` are supported).
+ * - `model`: optional model override for the runner (forwarded to the
+ *   selected runner's model field).
+ * - `description`: optional human-readable description shown in logs and
+ *   on the Linear timeline.
+ */
+const CustomPersonalityConfigSchema = z.object({
+	labels: z.array(z.string()),
+	promptPath: z.string(),
+	allowedTools: ToolRestrictionSchema.optional(),
+	disallowedTools: z.array(z.string()).optional(),
+	model: z.string().optional(),
+	description: z.string().optional(),
+});
+
+/**
+ * Map of custom personality keys to their config. The key is the
+ * personality's internal name (e.g. `"reviewer"`, `"security-auditor"`)
+ * and is used in logs and as the personality identifier in
+ * `SystemPromptResult.customPersonalityKey`.
+ */
+const CustomPersonalitiesSchema = z.record(
+	z.string(),
+	CustomPersonalityConfigSchema,
+);
+
+/**
  * Header transform rule for egress proxy.
  * Injects or overrides HTTP headers on outgoing requests to a specific domain.
  * Follows the Vercel Sandbox Firewall transform interface.
@@ -309,6 +350,13 @@ export const RepositoryConfigSchema = z.object({
 	// Label-based system prompt configuration
 	labelPrompts: LabelPromptsSchema.optional(),
 
+	/**
+	 * User-defined custom personalities for this repository. Checked
+	 * before the built-in `labelPrompts` matcher; first matching personality
+	 * wins. Keys are personality names; values are the config.
+	 */
+	customPersonalities: CustomPersonalitiesSchema.optional(),
+
 	// Repository-specific user access control
 	userAccessControl: UserAccessControlConfigSchema.optional(),
 });
@@ -468,6 +516,13 @@ export const EdgeConfigSchema = z.object({
 	promptDefaults: PromptDefaultsSchema.optional(),
 
 	/**
+	 * Workspace-wide custom personalities, available to every repository.
+	 * Per-repository `customPersonalities` are checked first and take
+	 * precedence on key collisions.
+	 */
+	customPersonalities: CustomPersonalitiesSchema.optional(),
+
+	/**
 	 * Sandbox configuration for network egress control.
 	 * When enabled, starts an egress proxy and configures Claude Code to route
 	 * all agent network traffic through it for inspection and filtering.
@@ -590,6 +645,10 @@ export type UserAccessControlConfig = z.infer<
 export type LinearWorkspaceConfig = z.infer<typeof LinearWorkspaceConfigSchema>;
 export type RepositoryConfig = z.infer<typeof RepositoryConfigSchema>;
 export type EdgeConfig = z.infer<typeof EdgeConfigSchema>;
+export type CustomPersonalityConfig = z.infer<
+	typeof CustomPersonalityConfigSchema
+>;
+export type CustomPersonalities = z.infer<typeof CustomPersonalitiesSchema>;
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type NetworkPolicy = z.infer<typeof NetworkPolicySchema>;
 export type RepositoryConfigPayload = z.infer<

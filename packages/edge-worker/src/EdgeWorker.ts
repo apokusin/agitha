@@ -28,6 +28,7 @@ import type {
 	AgentSessionPromptedWebhook,
 	BaseBranchResolution,
 	ContentUpdateMessage,
+	CustomPersonalityConfig,
 	CyrusAgentSession,
 	EdgeWorkerConfig,
 	GuidanceRule,
@@ -152,7 +153,7 @@ import { EgressProxy } from "./EgressProxy.js";
 import { GitService } from "./GitService.js";
 import { GlobalSessionRegistry } from "./GlobalSessionRegistry.js";
 import { McpConfigService } from "./McpConfigService.js";
-import { PromptBuilder } from "./PromptBuilder.js";
+import { PromptBuilder, type SystemPromptResult } from "./PromptBuilder.js";
 import type {
 	IssueContextResult,
 	PromptAssembly,
@@ -311,7 +312,28 @@ export class EdgeWorker extends EventEmitter {
 			slackMcpConfigs: resolveList(config.slackMcpConfigs),
 			linearMcpConfigs: resolveList(config.linearMcpConfigs),
 			githubMcpConfigs: resolveList(config.githubMcpConfigs),
+			customPersonalities: EdgeWorker.normalizeCustomPersonalitiesPaths(
+				config.customPersonalities,
+			),
 		};
+	}
+
+	/**
+	 * Resolve `~/` and relative paths in every personality's `promptPath`.
+	 * Returns a new object — original config is not mutated.
+	 */
+	private static normalizeCustomPersonalitiesPaths<
+		T extends Record<string, { promptPath: string }> | undefined,
+	>(personalities: T): T {
+		if (!personalities) return personalities;
+		const result: Record<string, { promptPath: string }> = {};
+		for (const [key, config] of Object.entries(personalities)) {
+			result[key] = {
+				...config,
+				promptPath: resolvePath(config.promptPath),
+			};
+		}
+		return result as T;
 	}
 
 	constructor(config: EdgeWorkerConfig) {
@@ -502,6 +524,9 @@ export class EdgeWorker extends EventEmitter {
 					promptTemplatePath: repo.promptTemplatePath
 						? resolvePath(repo.promptTemplatePath)
 						: undefined,
+					customPersonalities: EdgeWorker.normalizeCustomPersonalitiesPaths(
+						repo.customPersonalities,
+					),
 				};
 
 				this.repositories.set(repo.id, resolvedRepo);
@@ -598,6 +623,9 @@ export class EdgeWorker extends EventEmitter {
 			repositories: this.repositories,
 			issueTrackers: this.issueTrackers,
 			gitService: this.gitService,
+			// Read workspace-wide custom personalities lazily so hot-reloaded
+			// config (via ConfigManager) is picked up without re-instantiation.
+			getWorkspaceCustomPersonalities: () => this.config.customPersonalities,
 		});
 		this.defaultSkillsDeployer = new DefaultSkillsDeployer(
 			this.cyrusHome,
@@ -2860,6 +2888,9 @@ ${taskSection}`;
 					promptTemplatePath: repo.promptTemplatePath
 						? resolvePath(repo.promptTemplatePath)
 						: undefined,
+					customPersonalities: EdgeWorker.normalizeCustomPersonalitiesPaths(
+						repo.customPersonalities,
+					),
 				};
 
 				// Add to internal map
@@ -2903,6 +2934,9 @@ ${taskSection}`;
 					promptTemplatePath: repo.promptTemplatePath
 						? resolvePath(repo.promptTemplatePath)
 						: undefined,
+					customPersonalities: EdgeWorker.normalizeCustomPersonalitiesPaths(
+						repo.customPersonalities,
+					),
 				};
 
 				// Update stored config
@@ -4361,6 +4395,7 @@ ${taskSection}`;
 				| "orchestrator"
 				| "graphite-orchestrator"
 				| undefined;
+			let customPersonality: CustomPersonalityConfig | undefined;
 
 			if (!isMentionTriggered || isLabelBasedPromptRequested) {
 				const systemPromptResult = await this.determineSystemPromptFromLabels(
@@ -4369,6 +4404,7 @@ ${taskSection}`;
 				);
 				systemPromptVersion = systemPromptResult?.version;
 				promptType = systemPromptResult?.type;
+				customPersonality = systemPromptResult?.customPersonality?.config;
 
 				// Post thought about system prompt selection
 				if (assembly.systemPrompt) {
@@ -4382,10 +4418,15 @@ ${taskSection}`;
 			}
 
 			// Build allowed tools list with Linear MCP tools (now with prompt type context)
-			const allowedTools = this.buildAllowedTools(repositories, promptType);
+			const allowedTools = this.buildAllowedTools(
+				repositories,
+				promptType,
+				customPersonality,
+			);
 			const disallowedTools = this.buildDisallowedTools(
 				repositories,
 				promptType,
+				customPersonality,
 			);
 
 			log.debug(
@@ -4416,6 +4457,8 @@ ${taskSection}`;
 					undefined, // maxTurns
 					linearWorkspaceId,
 					this.buildSkillSessionContext(primaryRepo, fullIssue),
+					"linear", // sessionPlatform
+					customPersonality, // Personality-based model override
 				);
 
 			log.debug(
@@ -5186,19 +5229,7 @@ ${taskSection}`;
 	private async determineSystemPromptFromLabels(
 		labels: string[],
 		repository: RepositoryConfig,
-	): Promise<
-		| {
-				prompt: string;
-				version?: string;
-				type?:
-					| "debugger"
-					| "builder"
-					| "scoper"
-					| "orchestrator"
-					| "graphite-orchestrator";
-		  }
-		| undefined
-	> {
+	): Promise<SystemPromptResult | undefined> {
 		return this.promptBuilder.determineSystemPromptFromLabels(labels, [
 			repository,
 		]);
@@ -6265,6 +6296,12 @@ ${input.userComment}
 		 * Defaults to `"linear"` (the pre-platform-aware behavior).
 		 */
 		sessionPlatform: "linear" | "github" | "gitlab" = "linear",
+		/**
+		 * Optional custom personality matched on the issue's labels. When
+		 * provided, its `model` (if set) overrides label/repo-level model
+		 * selectors so the personality fully determines runtime behavior.
+		 */
+		customPersonality?: CustomPersonalityConfig,
 	): Promise<{ config: AgentRunnerConfig; runnerType: RunnerType }> {
 		const log = this.logger.withContext({
 			sessionId,
@@ -6296,6 +6333,7 @@ ${input.userComment}
 			labels,
 			issueDescription,
 			maxTurns,
+			personalityModelOverride: customPersonality?.model,
 			// Per-platform MCP config paths — GitHub + GitLab share the
 			// `githubMcpConfigs` knob (single-repo PR contexts both); Linear
 			// gets `linearMcpConfigs`. Not a blanket override: the builder
@@ -6375,10 +6413,12 @@ ${input.userComment}
 			| "scoper"
 			| "orchestrator"
 			| "graphite-orchestrator",
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
 		return this.toolPermissionResolver.buildDisallowedTools(
 			repositories,
 			promptType,
+			customPersonality,
 		);
 	}
 
@@ -6394,10 +6434,12 @@ ${input.userComment}
 			| "scoper"
 			| "orchestrator"
 			| "graphite-orchestrator",
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
 		return this.toolPermissionResolver.buildAllowedTools(
 			repositories,
 			promptType,
+			customPersonality,
 		);
 	}
 
@@ -7022,10 +7064,19 @@ ${input.userComment}
 		);
 		const systemPrompt = systemPromptResult?.prompt;
 		const promptType = systemPromptResult?.type;
+		const customPersonality = systemPromptResult?.customPersonality?.config;
 
 		// Build allowed and disallowed tools lists
-		const allowedTools = this.buildAllowedTools(repository, promptType);
-		const disallowedTools = this.buildDisallowedTools(repository, promptType);
+		const allowedTools = this.buildAllowedTools(
+			repository,
+			promptType,
+			customPersonality,
+		);
+		const disallowedTools = this.buildDisallowedTools(
+			repository,
+			promptType,
+			customPersonality,
+		);
 
 		// Set up attachments directory
 		const workspaceFolderName = basename(session.workspace.path);
@@ -7077,6 +7128,8 @@ ${input.userComment}
 				maxTurns, // Pass maxTurns if specified
 				resolvedWorkspaceId,
 				this.buildSkillSessionContext(repository, fullIssue),
+				"linear", // sessionPlatform
+				customPersonality, // Personality-based model override
 			);
 
 		// Create the appropriate runner based on session state

@@ -8,6 +8,8 @@ import type { Issue } from "./issue-tracker/types.js";
 
 // Re-export schemas and types from config-schemas
 export {
+	type CustomPersonalities,
+	type CustomPersonalityConfig,
 	type EdgeConfig,
 	type EdgeConfigPayload,
 	EdgeConfigPayloadSchema,

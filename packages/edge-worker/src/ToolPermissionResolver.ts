@@ -3,7 +3,12 @@ import {
 	getCoordinatorTools,
 	getSafeTools,
 } from "cyrus-claude-runner";
-import type { EdgeWorkerConfig, ILogger, RepositoryConfig } from "cyrus-core";
+import type {
+	CustomPersonalityConfig,
+	EdgeWorkerConfig,
+	ILogger,
+	RepositoryConfig,
+} from "cyrus-core";
 import {
 	GITHUB_DEFAULT_ALLOWED_TOOLS,
 	LINEAR_DEFAULT_ALLOWED_TOOLS,
@@ -118,11 +123,20 @@ export class ToolPermissionResolver {
 	 * resolved list (per-repo presets resolved first, then unioned). When no
 	 * repos are passed, falls back to the workspace `linearAllowedTools`
 	 * (or the Linear platform default when neither is set).
+	 *
+	 * When `customPersonality` is provided and declares `allowedTools`, that
+	 * list (preset-resolved) replaces all per-repo resolution — custom
+	 * personalities are an explicit, self-contained tool surface.
 	 */
 	public buildAllowedTools(
 		repositories: RepositoryConfig | RepositoryConfig[],
 		promptType?: PromptType,
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
+		if (customPersonality?.allowedTools !== undefined) {
+			return this.resolveToolPreset(customPersonality.allowedTools);
+		}
+
 		const repoArray = Array.isArray(repositories)
 			? repositories
 			: [repositories];
@@ -160,6 +174,7 @@ export class ToolPermissionResolver {
 	public buildGithubAllowedTools(
 		repository: RepositoryConfig,
 		promptType?: PromptType,
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
 		const platformDefault =
 			this.config.githubAllowedTools &&
@@ -170,7 +185,7 @@ export class ToolPermissionResolver {
 		const originalDefault = this.config.linearAllowedTools;
 		this.config.linearAllowedTools = platformDefault;
 		try {
-			return this.buildAllowedTools(repository, promptType);
+			return this.buildAllowedTools(repository, promptType, customPersonality);
 		} finally {
 			this.config.linearAllowedTools = originalDefault;
 		}
@@ -233,7 +248,12 @@ export class ToolPermissionResolver {
 	public buildDisallowedTools(
 		repositories: RepositoryConfig | RepositoryConfig[],
 		promptType?: PromptType,
+		customPersonality?: CustomPersonalityConfig,
 	): string[] {
+		if (customPersonality?.disallowedTools !== undefined) {
+			return [...customPersonality.disallowedTools];
+		}
+
 		const repoArray = Array.isArray(repositories)
 			? repositories
 			: [repositories];

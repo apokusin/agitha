@@ -70,6 +70,8 @@ export type {
 } from "./CyrusAgentSession.js";
 // Configuration types
 export type {
+	CustomPersonalities,
+	CustomPersonalityConfig,
 	EdgeConfig,
 	EdgeConfigPayload,
 	EdgeWorkerConfig,

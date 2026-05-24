@@ -398,6 +398,66 @@
 			},
 			"additionalProperties": false
 		},
+		"customPersonalities": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string"
+			},
+			"additionalProperties": {
+				"type": "object",
+				"properties": {
+					"labels": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					"promptPath": {
+						"type": "string"
+					},
+					"allowedTools": {
+						"anyOf": [
+							{
+								"type": "array",
+								"items": {
+									"type": "string"
+								}
+							},
+							{
+								"type": "string",
+								"const": "readOnly"
+							},
+							{
+								"type": "string",
+								"const": "safe"
+							},
+							{
+								"type": "string",
+								"const": "all"
+							},
+							{
+								"type": "string",
+								"const": "coordinator"
+							}
+						]
+					},
+					"disallowedTools": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					"model": {
+						"type": "string"
+					},
+					"description": {
+						"type": "string"
+					}
+				},
+				"required": ["labels", "promptPath"],
+				"additionalProperties": false
+			}
+		},
 		"userAccessControl": {
 			"type": "object",
 			"properties": {

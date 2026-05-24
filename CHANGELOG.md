@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Custom personalities.** Define your own agent roles (e.g. `code-reviewer`, `security-auditor`) that pair Linear labels with a system-prompt markdown file plus optional tool / model overrides. Configure at the workspace level (top-level `customPersonalities`) or per-repository (inside a repository entry). Custom personalities match before the built-in label modes (debugger/builder/scoper/orchestrator) and take precedence when their labels match. See `docs/CONFIG_FILE.md#custom-personalities`.
+
+### Changed
+- License metadata corrected from MIT to Apache-2.0 in `package.json` files (the project's `LICENSE` file has always been Apache 2.0; this aligns the SPDX field for license scanners and downstream consumers).
+
 ## [0.2.57] - 2026-05-22
 
 ### Fixed

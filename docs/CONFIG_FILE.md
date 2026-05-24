@@ -142,6 +142,73 @@ Note: Linear MCP tools (`mcp__linear`) are always included automatically. Slack 
 
 ---
 
+## Custom Personalities
+
+### `customPersonalities` (object)
+
+User-defined agent personalities that pair Linear labels with your own system prompts and tool permissions. Custom personalities are matched **before** the built-in `labelPrompts` modes (debugger / builder / scoper / orchestrator) and take precedence when their labels match.
+
+Can be configured at the workspace level (top-level `customPersonalities` in `config.json`) or per-repository (inside a repository entry). Per-repository definitions are checked first and override workspace-level definitions on key collisions.
+
+**Properties per entry:**
+
+- **`labels`** (array of strings, required) — Linear label names that trigger this personality. Matching is case-insensitive.
+- **`promptPath`** (string, required) — Path to the system-prompt markdown file. Supports `~/` expansion (resolved against the user's home directory) and is resolved at config load time.
+- **`allowedTools`** (string or array, optional) — Tool list or preset (`"readOnly"`, `"safe"`, `"all"`, `"coordinator"`). When set, fully replaces the resolved tool list — the personality owns its tool surface.
+- **`disallowedTools`** (array of strings, optional) — Tools to explicitly deny. When set, fully replaces any per-repository / global disallow list.
+- **`model`** (string, optional) — Model override for the runner (e.g., `"claude-opus-4-7"`). Takes precedence over per-issue description tags, per-repo `model`, and runner defaults.
+- **`description`** (string, optional) — Human-readable description shown in logs.
+
+**Workspace-level example:**
+
+```json
+{
+  "customPersonalities": {
+    "code-reviewer": {
+      "labels": ["Code Review", "PR Review"],
+      "promptPath": "~/.cyrus/personalities/code-reviewer.md",
+      "allowedTools": "readOnly",
+      "model": "claude-opus-4-7",
+      "description": "Read-only code review personality"
+    },
+    "security-auditor": {
+      "labels": ["Security"],
+      "promptPath": "~/.cyrus/personalities/security-auditor.md",
+      "allowedTools": ["Read", "Glob", "Grep", "WebFetch"]
+    }
+  },
+  "repositories": [...]
+}
+```
+
+**Per-repository example:**
+
+```json
+{
+  "repositories": [
+    {
+      "id": "...",
+      "customPersonalities": {
+        "design-doc-writer": {
+          "labels": ["Design Doc"],
+          "promptPath": "/abs/path/to/repo/.cyrus/personalities/design.md",
+          "allowedTools": ["Read", "Glob", "Grep", "WebFetch", "mcp__linear"]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Notes:**
+
+- The prompt file should be valid markdown. Optionally include `<version-tag value="..." />` near the top to surface a version in logs.
+- When a custom personality matches, the built-in `labelPrompts` resolution is skipped and the personality's `allowedTools` / `disallowedTools` / `model` (when set) replace the corresponding chain entries.
+- When the personality omits `allowedTools` / `disallowedTools`, normal resolution applies (repository overrides, then global defaults).
+- If the prompt file cannot be read at session start, the personality is skipped and the built-in matcher runs as a fallback.
+
+---
+
 ## User Access Control
 
 Control which Linear users can delegate issues to Cyrus. Supports both global configuration and per-repository overrides.

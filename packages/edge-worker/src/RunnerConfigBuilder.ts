@@ -126,6 +126,13 @@ export interface IssueRunnerConfigInput {
 	linearWorkspaceId?: string;
 	cyrusHome: string;
 	logger: ILogger;
+	/**
+	 * Optional model override from a matched custom personality. Takes
+	 * precedence over label/description `modelOverride` selectors and the
+	 * per-repository `model` field. Unset when no custom personality
+	 * matched (or when the personality omitted `model`).
+	 */
+	personalityModelOverride?: string;
 	onMessage: (message: SDKMessage) => void | Promise<void>;
 	onError: (error: Error) => void;
 	/** Factory to create AskUserQuestion callback (Claude runner only) */
@@ -318,11 +325,20 @@ export class RunnerConfigBuilder {
 			log.debug(`Model override via selector: ${modelOverride}`);
 		}
 
-		// Determine final model from selectors, repository override, then runner-specific defaults
+		// Determine final model — highest priority is an explicit custom
+		// personality override (the personality is the most specific match
+		// for the session), then label/description selectors, then the
+		// per-repository default, then runner-specific defaults.
 		const finalModel =
+			input.personalityModelOverride ||
 			modelOverride ||
 			input.repository.model ||
 			this.runnerSelector.getDefaultModelForRunner(runnerType);
+		if (input.personalityModelOverride) {
+			log.debug(
+				`Model override via custom personality: ${input.personalityModelOverride}`,
+			);
+		}
 
 		const resolvedWorkspaceId =
 			input.linearWorkspaceId ??
