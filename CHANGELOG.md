@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Internal
+- Extracted `LabelBasedSessionResolver` from `EdgeWorker.ts`. The new class consolidates the label-based session bootstrap pipeline (custom-personality matching → tool resolution → personality config threading) that was previously duplicated across the new-session and resume code paths. EdgeWorker now calls `labelBasedSessionResolver.resolve(...)` once at each site, eliminating ~40 lines of duplicate unpacking and the risk of a future caller forgetting to thread `customPersonality` through.
+
 ### Added
 - **Custom personalities.** Define your own agent roles (e.g. `code-reviewer`, `security-auditor`) that pair Linear labels with a system-prompt markdown file plus optional tool / model overrides. Configure at the workspace level (top-level `customPersonalities`) or per-repository (inside a repository entry). Custom personalities match before the built-in label modes (debugger/builder/scoper/orchestrator) and take precedence when their labels match. See `docs/CONFIG_FILE.md#custom-personalities`.
 - **Personality write-scoping.** Optional `writeScopes` field on a custom personality scopes any bare `Write` / `Edit` in `allowedTools` to one or more workspace-relative glob patterns (e.g. `["./content/**"]` for a copy-writer personality). Already-parenthesized entries pass through unchanged.

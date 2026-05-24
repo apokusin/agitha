@@ -204,10 +204,11 @@ describe("EdgeWorker - Custom Personalities Wiring", () => {
 		const edgeWorker = new EdgeWorker(makeBaseConfig({ repositories: [repo] }));
 
 		// 1. The personality should be matched by label (per-repo source).
-		const determineSystemPromptFromLabels = (
-			edgeWorker as any
-		).determineSystemPromptFromLabels.bind(edgeWorker);
-		const result = await determineSystemPromptFromLabels(["Code Review"], repo);
+		const promptBuilder = (edgeWorker as any).promptBuilder;
+		const result = await promptBuilder.determineSystemPromptFromLabels(
+			["Code Review"],
+			[repo],
+		);
 
 		expect(result).toBeDefined();
 		expect(result.customPersonality).toBeDefined();
@@ -263,10 +264,11 @@ describe("EdgeWorker - Custom Personalities Wiring", () => {
 			}),
 		);
 
-		const determineSystemPromptFromLabels = (
-			edgeWorker as any
-		).determineSystemPromptFromLabels.bind(edgeWorker);
-		const result = await determineSystemPromptFromLabels(["Security"], repo);
+		const promptBuilder = (edgeWorker as any).promptBuilder;
+		const result = await promptBuilder.determineSystemPromptFromLabels(
+			["Security"],
+			[repo],
+		);
 
 		expect(result).toBeDefined();
 		expect(result.customPersonality).toBeDefined();
@@ -298,10 +300,11 @@ describe("EdgeWorker - Custom Personalities Wiring", () => {
 			}),
 		);
 
-		const determineSystemPromptFromLabels = (
-			edgeWorker as any
-		).determineSystemPromptFromLabels.bind(edgeWorker);
-		const result = await determineSystemPromptFromLabels(["Review"], repo);
+		const promptBuilder = (edgeWorker as any).promptBuilder;
+		const result = await promptBuilder.determineSystemPromptFromLabels(
+			["Review"],
+			[repo],
+		);
 
 		expect(result).toBeDefined();
 		expect(result.customPersonality).toBeDefined();

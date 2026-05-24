@@ -152,12 +152,9 @@ import { DefaultSkillsDeployer } from "./DefaultSkillsDeployer.js";
 import { EgressProxy } from "./EgressProxy.js";
 import { GitService } from "./GitService.js";
 import { GlobalSessionRegistry } from "./GlobalSessionRegistry.js";
+import { LabelBasedSessionResolver } from "./LabelBasedSessionResolver.js";
 import { McpConfigService } from "./McpConfigService.js";
-import {
-	type CustomPersonalityMatch,
-	PromptBuilder,
-	type SystemPromptResult,
-} from "./PromptBuilder.js";
+import { type CustomPersonalityMatch, PromptBuilder } from "./PromptBuilder.js";
 import type {
 	IssueContextResult,
 	PromptAssembly,
@@ -247,6 +244,7 @@ export class EdgeWorker extends EventEmitter {
 	private activityPoster: ActivityPoster;
 	private configManager: ConfigManager;
 	private promptBuilder: PromptBuilder;
+	private labelBasedSessionResolver: LabelBasedSessionResolver;
 	private defaultSkillsDeployer: DefaultSkillsDeployer;
 	private skillsPluginResolver: SkillsPluginResolver;
 	private readonly agithaToolsMcpEndpoint = "/mcp/agitha-tools";
@@ -631,6 +629,11 @@ export class EdgeWorker extends EventEmitter {
 			// config (via ConfigManager) is picked up without re-instantiation.
 			getWorkspaceCustomPersonalities: () => this.config.customPersonalities,
 		});
+		this.labelBasedSessionResolver = new LabelBasedSessionResolver(
+			this.promptBuilder,
+			this.toolPermissionResolver,
+			this.logger,
+		);
 		this.defaultSkillsDeployer = new DefaultSkillsDeployer(
 			this.agithaHome,
 			this.logger,
@@ -4391,49 +4394,33 @@ ${taskSection}`;
 			const assembly = await this.assemblePrompt(input);
 
 			// Get systemPromptVersion for tracking (TODO: add to PromptAssembly metadata)
-			let systemPromptVersion: string | undefined;
-			let promptType:
-				| "debugger"
-				| "builder"
-				| "scoper"
-				| "orchestrator"
-				| "graphite-orchestrator"
-				| undefined;
-			let customPersonality: CustomPersonalityConfig | undefined;
+			const resolution = await this.labelBasedSessionResolver.resolve({
+				labels,
+				issueDescription: fullIssue.description || undefined,
+				primaryRepository: primaryRepo,
+				repositoriesForToolUnion: repositories,
+				sessionPlatform: "linear",
+				skipLabelBasedPrompt: Boolean(
+					isMentionTriggered && !isLabelBasedPromptRequested,
+				),
+			});
+			const systemPromptVersion = resolution.systemPromptVersion;
+			const customPersonality = resolution.customPersonality;
+			const allowedTools = resolution.allowedTools;
+			const disallowedTools = resolution.disallowedTools;
 
-			if (!isMentionTriggered || isLabelBasedPromptRequested) {
-				const systemPromptResult = await this.determineSystemPromptFromLabels(
+			// Post thought about system prompt selection (only when label-based
+			// resolution actually produced a system prompt and the assembly
+			// surfaced one).
+			if (resolution.systemPromptResult && assembly.systemPrompt) {
+				await this.postSystemPromptSelectionThought(
+					sessionId,
 					labels,
-					primaryRepo,
-					fullIssue.description || undefined,
+					linearWorkspaceId,
+					primaryRepo.id,
+					resolution.customPersonalityMatch,
 				);
-				systemPromptVersion = systemPromptResult?.version;
-				promptType = systemPromptResult?.type;
-				customPersonality = systemPromptResult?.customPersonality?.config;
-
-				// Post thought about system prompt selection
-				if (assembly.systemPrompt) {
-					await this.postSystemPromptSelectionThought(
-						sessionId,
-						labels,
-						linearWorkspaceId,
-						primaryRepo.id,
-						systemPromptResult?.customPersonality,
-					);
-				}
 			}
-
-			// Build allowed tools list with Linear MCP tools (now with prompt type context)
-			const allowedTools = this.buildAllowedTools(
-				repositories,
-				promptType,
-				customPersonality,
-			);
-			const disallowedTools = this.buildDisallowedTools(
-				repositories,
-				promptType,
-				customPersonality,
-			);
 
 			log.debug(
 				`Configured allowed tools for ${fullIssue.identifier}:`,
@@ -5227,24 +5214,6 @@ ${taskSection}`;
 			default:
 				throw new Error(`Unknown runner type: ${runnerType satisfies never}`);
 		}
-	}
-
-	/**
-	 * Determine system prompt based on issue labels and repository configuration.
-	 *
-	 * Pass `issueDescription` to also honor `[personality=<key>]` description
-	 * tags — those take precedence over label matching when present.
-	 */
-	private async determineSystemPromptFromLabels(
-		labels: string[],
-		repository: RepositoryConfig,
-		issueDescription?: string,
-	): Promise<SystemPromptResult | undefined> {
-		return this.promptBuilder.determineSystemPromptFromLabels(
-			labels,
-			[repository],
-			issueDescription,
-		);
 	}
 
 	/**
@@ -7075,26 +7044,16 @@ ${input.userComment}
 
 		// Fetch system prompt based on labels
 
-		const systemPromptResult = await this.determineSystemPromptFromLabels(
+		const resolution = await this.labelBasedSessionResolver.resolve({
 			labels,
-			repository,
-			fullIssue.description || undefined,
-		);
-		const systemPrompt = systemPromptResult?.prompt;
-		const promptType = systemPromptResult?.type;
-		const customPersonality = systemPromptResult?.customPersonality?.config;
-
-		// Build allowed and disallowed tools lists
-		const allowedTools = this.buildAllowedTools(
-			repository,
-			promptType,
-			customPersonality,
-		);
-		const disallowedTools = this.buildDisallowedTools(
-			repository,
-			promptType,
-			customPersonality,
-		);
+			issueDescription: fullIssue.description || undefined,
+			primaryRepository: repository,
+			sessionPlatform: "linear",
+		});
+		const systemPrompt = resolution.systemPrompt;
+		const customPersonality = resolution.customPersonality;
+		const allowedTools = resolution.allowedTools;
+		const disallowedTools = resolution.disallowedTools;
 
 		// Set up attachments directory
 		const workspaceFolderName = basename(session.workspace.path);
