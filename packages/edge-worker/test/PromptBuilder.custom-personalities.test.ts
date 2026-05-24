@@ -7,7 +7,7 @@ import type {
 	ILogger,
 	RepositoryConfig,
 } from "cyrus-core";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitService } from "../src/GitService.js";
 import { PromptBuilder } from "../src/PromptBuilder.js";
 
@@ -17,6 +17,15 @@ const silentLogger: ILogger = {
 	warn: () => {},
 	error: () => {},
 } as unknown as ILogger;
+
+function makeSpyLogger(): ILogger & { warn: ReturnType<typeof vi.fn> } {
+	return {
+		debug: vi.fn(),
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+	} as unknown as ILogger & { warn: ReturnType<typeof vi.fn> };
+}
 
 const stubGitService = {} as GitService;
 
@@ -38,10 +47,11 @@ function makeRepo(
 function makeBuilder(
 	repositories: RepositoryConfig[],
 	workspacePersonalities?: CustomPersonalities,
+	logger: ILogger = silentLogger,
 ) {
 	const repoMap = new Map(repositories.map((r) => [r.id, r]));
 	return new PromptBuilder({
-		logger: silentLogger,
+		logger,
 		repositories: repoMap,
 		issueTrackers: new Map<string, IIssueTrackerService>(),
 		gitService: stubGitService,
@@ -249,5 +259,130 @@ describe("PromptBuilder custom personalities", () => {
 
 		expect(result?.customPersonality).toBeUndefined();
 		expect(result?.type).toBe("debugger");
+	});
+
+	it("warns when two per-repo personalities share a matching label (first wins)", async () => {
+		const repo = makeRepo("repo-a", {
+			customPersonalities: {
+				reviewer: {
+					labels: ["Review"],
+					promptPath: reviewerPromptPath,
+				},
+				auditor: {
+					labels: ["Review"],
+					promptPath: auditorPromptPath,
+				},
+			},
+		});
+		const spyLogger = makeSpyLogger();
+		const builder = makeBuilder([repo], undefined, spyLogger);
+
+		const result = await builder.determineSystemPromptFromLabels(
+			["Review"],
+			[repo],
+		);
+
+		expect(result?.customPersonality?.key).toBe("reviewer");
+		expect(spyLogger.warn).toHaveBeenCalledTimes(1);
+		const warnMessage = spyLogger.warn.mock.calls[0]?.[0] as string;
+		expect(warnMessage).toContain("Custom personality conflict");
+		expect(warnMessage).toContain("'auditor'");
+		expect(warnMessage).toContain("repository:repo-a");
+		expect(warnMessage).toContain("'reviewer'");
+		expect(warnMessage).toContain("Review");
+		expect(warnMessage).toContain("(first match wins)");
+	});
+
+	it("warns when workspace personality with different key would also match", async () => {
+		const repo = makeRepo("repo-a", {
+			customPersonalities: {
+				reviewer: {
+					labels: ["Review"],
+					promptPath: reviewerPromptPath,
+				},
+			},
+		});
+		const spyLogger = makeSpyLogger();
+		const builder = makeBuilder(
+			[repo],
+			{
+				"security-auditor": {
+					labels: ["Review"],
+					promptPath: auditorPromptPath,
+				},
+			},
+			spyLogger,
+		);
+
+		const result = await builder.determineSystemPromptFromLabels(
+			["Review"],
+			[repo],
+		);
+
+		expect(result?.customPersonality?.key).toBe("reviewer");
+		expect(result?.customPersonality?.source).toBe("repository");
+		expect(spyLogger.warn).toHaveBeenCalledTimes(1);
+		const warnMessage = spyLogger.warn.mock.calls[0]?.[0] as string;
+		expect(warnMessage).toContain("Custom personality conflict");
+		expect(warnMessage).toContain("'security-auditor'");
+		expect(warnMessage).toContain("workspace");
+		expect(warnMessage).toContain("'reviewer'");
+		expect(warnMessage).toContain("repository:repo-a");
+	});
+
+	it("does not warn when workspace personality shares key with per-repo personality (precedence override)", async () => {
+		const repo = makeRepo("repo-a", {
+			customPersonalities: {
+				reviewer: {
+					labels: ["Review"],
+					promptPath: reviewerPromptPath,
+				},
+			},
+		});
+		const spyLogger = makeSpyLogger();
+		const builder = makeBuilder(
+			[repo],
+			{
+				reviewer: {
+					labels: ["Review"],
+					promptPath: auditorPromptPath,
+				},
+			},
+			spyLogger,
+		);
+
+		const result = await builder.determineSystemPromptFromLabels(
+			["Review"],
+			[repo],
+		);
+
+		expect(result?.customPersonality?.key).toBe("reviewer");
+		expect(result?.customPersonality?.source).toBe("repository");
+		expect(spyLogger.warn).not.toHaveBeenCalled();
+	});
+
+	it("does not warn when only a single personality matches (baseline)", async () => {
+		const repo = makeRepo("repo-a", {
+			customPersonalities: {
+				reviewer: {
+					labels: ["Review"],
+					promptPath: reviewerPromptPath,
+				},
+				auditor: {
+					labels: ["Security"],
+					promptPath: auditorPromptPath,
+				},
+			},
+		});
+		const spyLogger = makeSpyLogger();
+		const builder = makeBuilder([repo], undefined, spyLogger);
+
+		const result = await builder.determineSystemPromptFromLabels(
+			["Review"],
+			[repo],
+		);
+
+		expect(result?.customPersonality?.key).toBe("reviewer");
+		expect(spyLogger.warn).not.toHaveBeenCalled();
 	});
 });

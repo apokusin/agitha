@@ -230,6 +230,12 @@ export class PromptBuilder {
 	 * Within a single map, entries are iterated in insertion order; the
 	 * first personality whose labels list intersects the issue labels wins.
 	 *
+	 * After a winner is picked, any *additional* matching personality is
+	 * logged via `logger.warn` as a conflict so operators can clean up
+	 * ambiguous config. The exception: a workspace personality sharing its
+	 * key with a per-repo personality is a precedence override, not a
+	 * conflict, and is suppressed.
+	 *
 	 * Returns `undefined` if no custom personality matched.
 	 */
 	private async matchCustomPersonality(
@@ -237,55 +243,149 @@ export class PromptBuilder {
 		labels: string[],
 		repositories: RepositoryConfig[],
 	): Promise<SystemPromptResult | undefined> {
-		// 1. Per-repository personalities — first repo / first matching key wins.
+		// Collect every personality (per-repo first, then workspace) whose
+		// labels intersect the issue labels. We resolve the winner from this
+		// list and then warn on any remaining matches.
+		type Candidate = {
+			key: string;
+			config: CustomPersonalityConfig;
+			source: "repository" | "workspace";
+			repositoryId?: string;
+			matchingLabels: string[];
+		};
+
+		const candidates: Candidate[] = [];
+		const perRepoKeys = new Set<string>();
+
 		for (const repository of repositories) {
 			const personalities = repository.customPersonalities;
 			if (!personalities) continue;
 
 			for (const [key, config] of Object.entries(personalities)) {
-				if (this.labelsMatchPersonality(lowercaseLabels, config.labels)) {
-					const loaded = await this.loadCustomPersonalityPrompt(
+				perRepoKeys.add(key);
+				const matchingLabels = this.findMatchingLabels(
+					lowercaseLabels,
+					labels,
+					config.labels,
+				);
+				if (matchingLabels.length > 0) {
+					candidates.push({
 						key,
 						config,
-						labels,
-						"repository",
-						repository.id,
-					);
-					if (loaded) return loaded;
+						source: "repository",
+						repositoryId: repository.id,
+						matchingLabels,
+					});
 				}
 			}
 		}
 
-		// 2. Workspace-wide personalities — only consulted if no per-repo match.
 		const workspacePersonalities = this.getWorkspaceCustomPersonalities?.();
 		if (workspacePersonalities) {
 			for (const [key, config] of Object.entries(workspacePersonalities)) {
-				if (this.labelsMatchPersonality(lowercaseLabels, config.labels)) {
-					const loaded = await this.loadCustomPersonalityPrompt(
+				const matchingLabels = this.findMatchingLabels(
+					lowercaseLabels,
+					labels,
+					config.labels,
+				);
+				if (matchingLabels.length > 0) {
+					candidates.push({
 						key,
 						config,
-						labels,
-						"workspace",
-					);
-					if (loaded) return loaded;
+						source: "workspace",
+						matchingLabels,
+					});
 				}
 			}
 		}
 
-		return undefined;
+		if (candidates.length === 0) {
+			return undefined;
+		}
+
+		// Pick the first loadable candidate as the winner; if a prompt file
+		// fails to load we fall through to the next candidate (preserving the
+		// previous behavior where unreadable prompts fall through to built-ins).
+		let winner: Candidate | undefined;
+		let winnerResult: SystemPromptResult | undefined;
+		let winnerIndex = -1;
+
+		for (let i = 0; i < candidates.length; i++) {
+			const candidate = candidates[i]!;
+			const loaded = await this.loadCustomPersonalityPrompt(
+				candidate.key,
+				candidate.config,
+				labels,
+				candidate.source,
+				candidate.repositoryId,
+			);
+			if (loaded) {
+				winner = candidate;
+				winnerResult = loaded;
+				winnerIndex = i;
+				break;
+			}
+		}
+
+		if (!winner || !winnerResult) {
+			return undefined;
+		}
+
+		// Warn on any *other* matching candidate. Suppress the workspace-vs-
+		// per-repo same-key case — that's a precedence override, not a
+		// conflict.
+		for (let i = 0; i < candidates.length; i++) {
+			if (i === winnerIndex) continue;
+			const other = candidates[i]!;
+
+			if (other.source === "workspace" && perRepoKeys.has(other.key)) {
+				continue;
+			}
+
+			const winnerSource = this.formatPersonalitySource(winner);
+			const otherSource = this.formatPersonalitySource(other);
+			this.logger.warn(
+				`Custom personality conflict: '${other.key}' (${otherSource}) would also match labels [${other.matchingLabels.join(", ")}] ` +
+					`but '${winner.key}' (${winnerSource}) already matched (first match wins)`,
+			);
+		}
+
+		return winnerResult;
 	}
 
 	/**
-	 * Returns true when at least one of the personality's configured labels
-	 * (case-insensitive) appears in the issue's labels.
+	 * Format a personality source for log messages.
 	 */
-	private labelsMatchPersonality(
+	private formatPersonalitySource(candidate: {
+		source: "repository" | "workspace";
+		repositoryId?: string;
+	}): string {
+		return candidate.source === "repository"
+			? `repository:${candidate.repositoryId ?? "?"}`
+			: "workspace";
+	}
+
+	/**
+	 * Returns the issue labels (in their original casing) that match any of
+	 * the personality's configured labels. Used both to decide whether a
+	 * personality matches and to surface the matching labels in conflict
+	 * warnings.
+	 */
+	private findMatchingLabels(
 		lowercaseIssueLabels: string[],
+		issueLabels: string[],
 		personalityLabels: string[],
-	): boolean {
-		return personalityLabels.some((label) =>
-			lowercaseIssueLabels.includes(label.toLowerCase()),
+	): string[] {
+		const personalityLowercase = new Set(
+			personalityLabels.map((label) => label.toLowerCase()),
 		);
+		const matched: string[] = [];
+		for (let i = 0; i < lowercaseIssueLabels.length; i++) {
+			if (personalityLowercase.has(lowercaseIssueLabels[i]!)) {
+				matched.push(issueLabels[i] ?? lowercaseIssueLabels[i]!);
+			}
+		}
+		return matched;
 	}
 
 	/**
