@@ -38,7 +38,7 @@
 		"cli"
 	],
 	"author": "",
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"dependencies": {
 		"@linear/sdk": "^64.0.0",
 		"@sentry/node": "^9.47.1",
