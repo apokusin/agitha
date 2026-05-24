@@ -144,6 +144,8 @@ Note: Linear MCP tools (`mcp__linear`) are always included automatically. Slack 
 
 ## Custom Personalities
 
+> **Looking for working examples?** See [`packages/edge-worker/examples/personalities/`](../packages/edge-worker/examples/personalities/) — two complete personalities (a copy-writer and a code-reviewer) plus a README with copy-paste `config.json` snippets that exercise every feature documented below.
+
 ### `customPersonalities` (object)
 
 User-defined agent personalities that pair Linear labels with your own system prompts and tool permissions. Custom personalities are matched **before** the built-in `labelPrompts` modes (debugger / builder / scoper / orchestrator) and take precedence when their labels match.

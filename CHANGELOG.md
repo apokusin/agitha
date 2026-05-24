@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Two shipped personality examples** under `packages/edge-worker/examples/personalities/` — a copy-writer (exercises `writeScopes`, `referenceDirs`, `requireAllLabels`) and a code-reviewer (exercises `readOnly` preset, `model` override). Each is a real, dogfooded system prompt with a README of copy-paste `config.json` snippets.
+
 ### Internal
 - Extracted `LabelBasedSessionResolver` from `EdgeWorker.ts`. The new class consolidates the label-based session bootstrap pipeline (custom-personality matching → tool resolution → personality config threading) that was previously duplicated across the new-session and resume code paths. EdgeWorker now calls `labelBasedSessionResolver.resolve(...)` once at each site, eliminating ~40 lines of duplicate unpacking and the risk of a future caller forgetting to thread `customPersonality` through.
 
