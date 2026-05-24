@@ -430,9 +430,9 @@ All notable changes to this project will be documented in this file.
 - **PR guardrail when sessions try to stop with unshipped work** — When the agent attempts to end a session, Agitha now inspects the worktree and blocks the first stop attempt if there are uncommitted changes or commits ahead of the upstream branch, prompting the agent to commit, push, and open a pull request. Sessions with no code changes (e.g. questions, research) stop normally. ([CYPACK-1140](https://linear.app/ceedar/issue/CYPACK-1140), [#1161](https://github.com/agithaagents/agitha/pull/1161))
 - **Remote Claude session transcripts** — When `AGITHA_APP_URL`, `AGITHA_API_KEY`, and `AGITHA_TEAM_ID` are all set, Agitha now mirrors every Claude session transcript to the hosted Agitha control plane (in addition to the local JSONL on disk). This lets sessions be inspected or resumed from any host, even after the ephemeral worktree is torn down. The transport speaks the Claude Agent SDK's `SessionStore` contract and passes the full 13-check behavioral conformance suite from the upstream SDK. Set `AGITHA_DISABLE_REMOTE_SESSION_STORE=1` to opt out and keep transcripts local-only. ([CYPACK-1121](https://linear.app/ceedar/issue/CYPACK-1121))
 - **Optional Sentry error tracking** — When both `AGITHA_SENTRY_DSN` and `AGITHA_TEAM_ID` are set (and `AGITHA_SENTRY_DISABLED` is not), all `logger.error(...)` calls across the codebase (Claude Code/runner errors, edge-worker failures, webhook transport errors, persistence errors, uncaught exceptions, unhandled rejections) are reported to Sentry as Issues, and `WARN`/`ERROR` logs plus major lifecycle events (session started/resumed/completed/stopped, Claude session ID assigned, message emitted, webhook received, Claude query options) are forwarded to [Sentry Logs](https://docs.sentry.io/product/explore/logs/) tagged with `team_id`, `component`, and active session/issue/Claude-session identifiers — debug/info logs stay local to keep volume bounded. `AGITHA_TEAM_ID` is the single gate for both Issues and Logs: installs without a tenant tag stay silent. Set `AGITHA_SENTRY_DISABLED=1` to opt out entirely (also disables the bundled default DSN once it ships). Override the environment tag with `AGITHA_SENTRY_ENVIRONMENT`, sample errors with `AGITHA_SENTRY_SAMPLE_RATE` (0.0–1.0). Every event is enriched with a structured `agitha` context block alongside `linear_workspace`/`deployment_id` if those env vars are set. The Sentry SDK's own internal debug output is gated separately on `AGITHA_SENTRY_DEBUG` to avoid flooding the terminal. Outgoing events **and** logs are scrubbed for token-shaped strings and sensitive keys before transmission (including breadcrumbs from console output), and grouped by a stable fingerprint so log messages with embedded IDs/paths don't fragment into one issue per occurrence. No telemetry is sent unless both env vars are present. ([CYPACK-1142](https://linear.app/ceedar/issue/CYPACK-1142))
-- **New `/linear-webhook` endpoint for Linear webhooks** — The Linear webhook URL in your OAuth application can now be set to `<AGITHA_BASE_URL>/linear-webhook`. The legacy `/webhook` path continues to work for backward compatibility but is deprecated and will log a warning on first use. ([CYPACK-1119](https://linear.app/ceedar/issue/CYPACK-1119), [#1142](https://github.com/ceedaragents/agitha/pull/1142))
-- **Base branch update notifications** - When your base branch receives new commits while Agitha is working, the active session is automatically notified to rebase, helping avoid merge conflicts. ([CYPACK-978](https://linear.app/ceedar/issue/CYPACK-978), [#1004](https://github.com/ceedaragents/agitha/pull/1004))
-- **Blocked-by dependency deferral** - Issues with unresolved `blocked_by` relationships are now automatically deferred instead of starting immediately. Agitha posts an acknowledgment and starts work automatically when all blocking issues are resolved. User re-prompts also re-check blocking status. ([CYPACK-978](https://linear.app/ceedar/issue/CYPACK-978), [#1004](https://github.com/ceedaragents/agitha/pull/1004))
+- **New `/linear-webhook` endpoint for Linear webhooks** — The Linear webhook URL in your OAuth application can now be set to `<AGITHA_BASE_URL>/linear-webhook`. The legacy `/webhook` path continues to work for backward compatibility but is deprecated and will log a warning on first use. ([CYPACK-1119](https://linear.app/ceedar/issue/CYPACK-1119), [#1142](https://github.com/apokusin/agitha/pull/1142))
+- **Base branch update notifications** - When your base branch receives new commits while Agitha is working, the active session is automatically notified to rebase, helping avoid merge conflicts. ([CYPACK-978](https://linear.app/ceedar/issue/CYPACK-978), [#1004](https://github.com/apokusin/agitha/pull/1004))
+- **Blocked-by dependency deferral** - Issues with unresolved `blocked_by` relationships are now automatically deferred instead of starting immediately. Agitha posts an acknowledgment and starts work automatically when all blocking issues are resolved. User re-prompts also re-check blocking status. ([CYPACK-978](https://linear.app/ceedar/issue/CYPACK-978), [#1004](https://github.com/apokusin/agitha/pull/1004))
 
 ### Changed
 - **Bump OpenAI Codex SDK (`@openai/codex-sdk`) to v0.125.x** — Updates the pinned Codex integration to match the current `@openai/codex` release line bundled by that SDK (`codex` CLI **0.125.0**, including richer `codex exec`/`turn.completed` usage fields such as reasoning output tokens observed in streamed JSON sessions). Hosts relying on Agitha’s pinned CLI via this dependency should behave the same aside from additive telemetry from Codex itself. ([CYPACK-1151](https://linear.app/ceedar/issue/CYPACK-1151), [#1171](https://github.com/agithaagents/agitha/pull/1171))
@@ -443,21 +443,21 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Patched 6 high-severity `tar` advisories pulled in by the new `@cursor/sdk` integration** — The `@cursor/sdk` → `sqlite3` → `tar@6.2.1` chain introduced in CYPACK-1149 was flagged by Dependabot for six path-traversal/hardlink/symlink advisories (CVE-2026-24842, CVE-2026-23745, CVE-2026-26960, CVE-2026-29786, CVE-2026-31802, and a related race condition). A root `pnpm.overrides` entry now pins `tar` to `>=7.5.11` for all transitive consumers; `sqlite3`'s install script and the rest of the dep graph still resolve cleanly. ([CYPACK-1159](https://linear.app/ceedar/issue/CYPACK-1159))
 - **Cursor sessions no longer crash with "Could not locate the bindings file" for `sqlite3`** — The `@cursor/sdk` switch in CYPACK-1149 introduced a transitive dependency on `sqlite3@5.1.7`, whose native `node_sqlite3.node` binding is fetched/built by an `install` lifecycle script. pnpm 10 blocks dependency lifecycle scripts by default, so fresh installs ended up with sqlite3 present but no native binding, and the first Cursor session on a clean `pnpm install` crashed at runtime. `sqlite3` is now in `pnpm.onlyBuiltDependencies` so its install script runs and the prebuilt binary lands on disk. ([CYPACK-1158](https://linear.app/ceedar/issue/CYPACK-1158), [#1174](https://github.com/agithaagents/agitha/pull/1174))
-- **Stop signals no longer trigger "Request was aborted" errors on non-warm sessions** — Previously, every stop signal called the SDK's `query.interrupt()` regardless of whether the session was warm, which surfaced an `Error: Request was aborted` from non-warm sessions. Stop signals now branch on session state: non-warm sessions are stopped immediately on the first signal, while warm sessions retain the existing two-step interrupt-then-stop UX (interrupt on first stop, full terminate on a second stop within 10s). ([CYPACK-1145](https://linear.app/ceedar/issue/CYPACK-1145), [#1165](https://github.com/ceedaragents/agitha/pull/1165))
+- **Stop signals no longer trigger "Request was aborted" errors on non-warm sessions** — Previously, every stop signal called the SDK's `query.interrupt()` regardless of whether the session was warm, which surfaced an `Error: Request was aborted` from non-warm sessions. Stop signals now branch on session state: non-warm sessions are stopped immediately on the first signal, while warm sessions retain the existing two-step interrupt-then-stop UX (interrupt on first stop, full terminate on a second stop within 10s). ([CYPACK-1145](https://linear.app/ceedar/issue/CYPACK-1145), [#1165](https://github.com/apokusin/agitha/pull/1165))
 - **Chat-platform replies (Slack/GitHub) are now posted when warm sessions are enabled** — Previously, `ChatSessionHandler` waited for `runner.startStreaming()` to resolve before calling the adapter's `postReply`. With `AGITHA_ENABLE_WARM_SESSIONS=1` the streaming prompt stays open across turns, so `startStreaming` never resolved and no reply was ever posted. Reply posting is now driven by `result` messages on the runner's message stream, decoupled from session termination. A FIFO queue of pending events per session ensures each turn (initial prompt, resume, or injected follow-up) is paired with its corresponding reply.
-- **Improved `ToolSearch` presentation in Linear activities** — `ToolSearch` calls now post as a regular action entry (with an expandable result) instead of a bare thought. The parameter reads like "Loading tool schemas: `TaskCreate`, `TaskUpdate`" or "Searching tools for: `+linear get_issue`", and the expanded result shows the tools that were loaded (e.g. "Loaded tools: `TaskCreate`, `TaskUpdate`"). ([CYPACK-1112](https://linear.app/ceedar/issue/CYPACK-1112), [#1134](https://github.com/ceedaragents/agitha/pull/1134))
+- **Improved `ToolSearch` presentation in Linear activities** — `ToolSearch` calls now post as a regular action entry (with an expandable result) instead of a bare thought. The parameter reads like "Loading tool schemas: `TaskCreate`, `TaskUpdate`" or "Searching tools for: `+linear get_issue`", and the expanded result shows the tools that were loaded (e.g. "Loaded tools: `TaskCreate`, `TaskUpdate`"). ([CYPACK-1112](https://linear.app/ceedar/issue/CYPACK-1112), [#1134](https://github.com/apokusin/agitha/pull/1134))
 
 ### Fixed
-- **Fixed garbled activity labels for parallel deferred-tool calls** — When Claude issued multiple `ToolSearch` (or other local deferred-tool) calls in quick succession, Linear sometimes displayed the result under a generic "Tool" label with a raw list of tool names (e.g. `Tool / mcp__digitalocean-droplets__droplet-create / ...`) instead of the proper `ToolSearch` action with a formatted result. Internal message processing is now serialized per session so the tool-use handler always registers before its matching tool-result is formatted. ([CYPACK-1112](https://linear.app/ceedar/issue/CYPACK-1112), [#1134](https://github.com/ceedaragents/agitha/pull/1134))
-- **Eliminated spurious blank lines in the Linear activity log** — Empty/whitespace-only assistant turns no longer produce blank "thought" activities, which previously appeared as an extra empty line between the "Using model: ..." notification and the first real tool call. ([CYPACK-1112](https://linear.app/ceedar/issue/CYPACK-1112), [#1134](https://github.com/ceedaragents/agitha/pull/1134))
+- **Fixed garbled activity labels for parallel deferred-tool calls** — When Claude issued multiple `ToolSearch` (or other local deferred-tool) calls in quick succession, Linear sometimes displayed the result under a generic "Tool" label with a raw list of tool names (e.g. `Tool / mcp__digitalocean-droplets__droplet-create / ...`) instead of the proper `ToolSearch` action with a formatted result. Internal message processing is now serialized per session so the tool-use handler always registers before its matching tool-result is formatted. ([CYPACK-1112](https://linear.app/ceedar/issue/CYPACK-1112), [#1134](https://github.com/apokusin/agitha/pull/1134))
+- **Eliminated spurious blank lines in the Linear activity log** — Empty/whitespace-only assistant turns no longer produce blank "thought" activities, which previously appeared as an extra empty line between the "Using model: ..." notification and the first real tool call. ([CYPACK-1112](https://linear.app/ceedar/issue/CYPACK-1112), [#1134](https://github.com/apokusin/agitha/pull/1134))
 
 ### Security
-- **Tightened sandbox and tool permission defaults** — Claude sessions now run with stricter out-of-the-box restrictions: the OS-level sandbox enforces `denyRead: ["~/"]` + `allowRead: ["."]` (home directory blocked, worktree allowed) and `allowWrite` scoped to the session worktree only. On the tool permission side, `Read`, `Edit`, and `Write` are now narrowed to `Read(**)`, `Edit(**)`, and `Write(**)` to prevent unintended matches. Home directory files (SSH keys, credentials, etc.) are explicitly enumerated and added to `disallowedTools` at session start, working around the fact that `Read(~/**)` does not match in Claude Code's permission layer. ([#1123](https://github.com/ceedaragents/agitha/pull/1123))
-- **Addressed open security advisories** — Refreshed `pnpm-lock.yaml` so vulnerable transitive dependencies resolve to their patched versions (`protobufjs`, `path-to-regexp`, `picomatch`, `flatted`, `brace-expansion`, `yaml`, `follow-redirects`, `vite`, `hono`, `@hono/node-server`) through their existing direct-dep paths, without introducing new `pnpm.overrides` entries. ([CYPACK-1101](https://linear.app/ceedar/issue/CYPACK-1101), [#1128](https://github.com/ceedaragents/agitha/pull/1128))
+- **Tightened sandbox and tool permission defaults** — Claude sessions now run with stricter out-of-the-box restrictions: the OS-level sandbox enforces `denyRead: ["~/"]` + `allowRead: ["."]` (home directory blocked, worktree allowed) and `allowWrite` scoped to the session worktree only. On the tool permission side, `Read`, `Edit`, and `Write` are now narrowed to `Read(**)`, `Edit(**)`, and `Write(**)` to prevent unintended matches. Home directory files (SSH keys, credentials, etc.) are explicitly enumerated and added to `disallowedTools` at session start, working around the fact that `Read(~/**)` does not match in Claude Code's permission layer. ([#1123](https://github.com/apokusin/agitha/pull/1123))
+- **Addressed open security advisories** — Refreshed `pnpm-lock.yaml` so vulnerable transitive dependencies resolve to their patched versions (`protobufjs`, `path-to-regexp`, `picomatch`, `flatted`, `brace-expansion`, `yaml`, `follow-redirects`, `vite`, `hono`, `@hono/node-server`) through their existing direct-dep paths, without introducing new `pnpm.overrides` entries. ([CYPACK-1101](https://linear.app/ceedar/issue/CYPACK-1101), [#1128](https://github.com/apokusin/agitha/pull/1128))
 
 ### Changed
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.117** — Bumps the bundled Claude Code binary from v2.1.116 to v2.1.117 (parity release with no tool-list changes). Also fixes `scripts/extract-claude-tools.sh` to work with the new native binary structure introduced in SDK v0.2.113 (now resolves the platform-specific optional dependency instead of the removed `cli.js`). See [SDK changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-1120](https://linear.app/ceedar/issue/CYPACK-1120), [#1143](https://github.com/ceedaragents/agitha/pull/1143))
-- **Update `@anthropic-ai/claude-agent-sdk` to v0.2.116** — Bumps the bundled Claude Code binary from v2.1.114 to v2.1.116 (parity releases with no tool-list changes). See [SDK changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-1111](https://linear.app/ceedar/issue/CYPACK-1111), [#1133](https://github.com/ceedaragents/agitha/pull/1133))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.117** — Bumps the bundled Claude Code binary from v2.1.116 to v2.1.117 (parity release with no tool-list changes). Also fixes `scripts/extract-claude-tools.sh` to work with the new native binary structure introduced in SDK v0.2.113 (now resolves the platform-specific optional dependency instead of the removed `cli.js`). See [SDK changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-1120](https://linear.app/ceedar/issue/CYPACK-1120), [#1143](https://github.com/apokusin/agitha/pull/1143))
+- **Update `@anthropic-ai/claude-agent-sdk` to v0.2.116** — Bumps the bundled Claude Code binary from v2.1.114 to v2.1.116 (parity releases with no tool-list changes). See [SDK changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-1111](https://linear.app/ceedar/issue/CYPACK-1111), [#1133](https://github.com/apokusin/agitha/pull/1133))
 
 ### Packages
 
@@ -563,7 +563,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.48] - 2026-04-20
 
 ### Changed
-- **Claude Code subprocess env scrubbing is disabled** — `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` is no longer set on Claude sessions while undesirable side effects from the Linux bubblewrap sandbox are investigated. The Linux sandbox requirements precheck (added in 0.2.46) still runs and logs guidance so it can be re-enabled quickly once the side effects are resolved. ([CYPACK-1108](https://linear.app/ceedar/issue/CYPACK-1108), [#1131](https://github.com/ceedaragents/agitha/pull/1131))
+- **Claude Code subprocess env scrubbing is disabled** — `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` is no longer set on Claude sessions while undesirable side effects from the Linux bubblewrap sandbox are investigated. The Linux sandbox requirements precheck (added in 0.2.46) still runs and logs guidance so it can be re-enabled quickly once the side effects are resolved. ([CYPACK-1108](https://linear.app/ceedar/issue/CYPACK-1108), [#1131](https://github.com/apokusin/agitha/pull/1131))
 
 ### Packages
 
@@ -615,11 +615,11 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.47] - 2026-04-20
 
 ### Fixed
-- **Runtime switches no longer require restarting Agitha** — When `agitha auth` rotates credentials (for example, after switching between cloud and self-host runtimes), incoming config updates from the Agitha web app now succeed immediately instead of failing with `401 Unauthorized` until the next process restart. ([CYHOST-798](https://linear.app/ceedar/issue/CYHOST-798), [#1127](https://github.com/ceedaragents/agitha/pull/1127))
+- **Runtime switches no longer require restarting Agitha** — When `agitha auth` rotates credentials (for example, after switching between cloud and self-host runtimes), incoming config updates from the Agitha web app now succeed immediately instead of failing with `401 Unauthorized` until the next process restart. ([CYHOST-798](https://linear.app/ceedar/issue/CYHOST-798), [#1127](https://github.com/apokusin/agitha/pull/1127))
 
 ### Changed
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.114** — Bumps the Claude Agent SDK to the latest version. See the [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for full details. ([CYPACK-1096](https://linear.app/ceedar/issue/CYPACK-1096), [#1124](https://github.com/ceedaragents/agitha/pull/1124))
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.112** — Bumps the Claude Agent SDK to the latest version. See the [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for full details. ([CYPACK-1093](https://linear.app/ceedar/issue/CYPACK-1093), [#1121](https://github.com/ceedaragents/agitha/pull/1121))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.114** — Bumps the Claude Agent SDK to the latest version. See the [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for full details. ([CYPACK-1096](https://linear.app/ceedar/issue/CYPACK-1096), [#1124](https://github.com/apokusin/agitha/pull/1124))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.112** — Bumps the Claude Agent SDK to the latest version. See the [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for full details. ([CYPACK-1093](https://linear.app/ceedar/issue/CYPACK-1093), [#1121](https://github.com/apokusin/agitha/pull/1121))
 
 ### Packages
 
@@ -671,15 +671,15 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.46] - 2026-04-16
 
 ### Added
-- **Linux sandbox requirements precheck** — On Linux hosts, Agitha now verifies that `socat`, `bubblewrap`, and the kernel/AppArmor configuration needed to create an unprivileged user namespace are all in place before enabling Claude Code's subprocess credential scrubbing. When a requirement is missing, the session continues but sandbox mode (`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`) is left unset and resolution guidance is printed to stdout. These requirements are documented by Anthropic [here](https://code.claude.com/docs/en/sandboxing#prerequisites). The source-code of Antrhopic's sandbox runtime can be found [here](https://github.com/anthropic-experimental/sandbox-runtime). ([CYPACK-1091](https://linear.app/ceedar/issue/CYPACK-1091), [#1115](https://github.com/ceedaragents/agitha/pull/1115))
+- **Linux sandbox requirements precheck** — On Linux hosts, Agitha now verifies that `socat`, `bubblewrap`, and the kernel/AppArmor configuration needed to create an unprivileged user namespace are all in place before enabling Claude Code's subprocess credential scrubbing. When a requirement is missing, the session continues but sandbox mode (`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`) is left unset and resolution guidance is printed to stdout. These requirements are documented by Anthropic [here](https://code.claude.com/docs/en/sandboxing#prerequisites). The source-code of Antrhopic's sandbox runtime can be found [here](https://github.com/anthropic-experimental/sandbox-runtime). ([CYPACK-1091](https://linear.app/ceedar/issue/CYPACK-1091), [#1115](https://github.com/apokusin/agitha/pull/1115))
 
 ### Changed
-- **Claude Opus 4.7 is now the default model** — The `opus` model alias now resolves to `claude-opus-4-7`. No configuration change needed — existing setups using `"opus"` (the default) automatically use Opus 4.7. ([CYPACK-1090](https://linear.app/ceedar/issue/CYPACK-1090), [#1113](https://github.com/ceedaragents/agitha/pull/1113))
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.111 and `@anthropic-ai/sdk` to v0.90.0** — Refreshed both Anthropic SDK dependencies to their latest versions. Also updated tool allowance lists to match the new SDK: adds `LSP`, `ToolSearch`, and `PushNotification`. See the [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for full details. ([CYPACK-1090](https://linear.app/ceedar/issue/CYPACK-1090), [#1113](https://github.com/ceedaragents/agitha/pull/1113))
+- **Claude Opus 4.7 is now the default model** — The `opus` model alias now resolves to `claude-opus-4-7`. No configuration change needed — existing setups using `"opus"` (the default) automatically use Opus 4.7. ([CYPACK-1090](https://linear.app/ceedar/issue/CYPACK-1090), [#1113](https://github.com/apokusin/agitha/pull/1113))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.111 and `@anthropic-ai/sdk` to v0.90.0** — Refreshed both Anthropic SDK dependencies to their latest versions. Also updated tool allowance lists to match the new SDK: adds `LSP`, `ToolSearch`, and `PushNotification`. See the [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for full details. ([CYPACK-1090](https://linear.app/ceedar/issue/CYPACK-1090), [#1113](https://github.com/apokusin/agitha/pull/1113))
 
 ### Fixed
-- **Cloud runtime provisioning no longer fails on first repository** — Fixed a race condition where the edge worker tried to initialize a new repository before Linear workspace tokens were available, causing "No Linear workspace config found" errors during cloud runtime provisioning. ([CYPACK-1089](https://linear.app/ceedar/issue/CYPACK-1089), [#1112](https://github.com/ceedaragents/agitha/pull/1112))
-- **Working directory context now shows actual path** — The `<working_directory>` in agent session prompts previously showed "Will be created based on issue" instead of the actual worktree path. It now correctly displays the real workspace directory. ([CYPACK-1088](https://linear.app/ceedar/issue/CYPACK-1088), [#1110](https://github.com/ceedaragents/agitha/pull/1110))
+- **Cloud runtime provisioning no longer fails on first repository** — Fixed a race condition where the edge worker tried to initialize a new repository before Linear workspace tokens were available, causing "No Linear workspace config found" errors during cloud runtime provisioning. ([CYPACK-1089](https://linear.app/ceedar/issue/CYPACK-1089), [#1112](https://github.com/apokusin/agitha/pull/1112))
+- **Working directory context now shows actual path** — The `<working_directory>` in agent session prompts previously showed "Will be created based on issue" instead of the actual worktree path. It now correctly displays the real workspace directory. ([CYPACK-1088](https://linear.app/ceedar/issue/CYPACK-1088), [#1110](https://github.com/apokusin/agitha/pull/1110))
 
 ### Packages
 
@@ -731,17 +731,17 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.45] - 2026-04-15
 
 ### Added
-- **Customizable repos directory** — Set `AGITHA_REPOS_DIR` to control where Agitha clones repositories, similar to the existing `AGITHA_WORKTREES_DIR` for worktrees. Defaults to `~/.agitha/repos` when unset. ([CYPACK-1081](https://linear.app/ceedar/issue/CYPACK-1081), [#1104](https://github.com/ceedaragents/agitha/pull/1104))
-- **Network egress sandboxing** — Agent sessions can now route all network traffic through a local egress proxy for domain filtering, request logging, and per-domain header injection (credentials brokering). Enable with `sandbox.enabled: true` in `~/.agitha/config.json`. When enabled, Bash commands are restricted to writing only within the session worktree directory — no writes to any other path on disk. Supports TLS termination for domains with transform rules, following the Vercel Sandbox Firewall interface. Sandbox network ports are passed to each Claude Agent SDK session automatically. ([CYPACK-1066](https://linear.app/ceedar/issue/CYPACK-1066), [#1095](https://github.com/ceedaragents/agitha/pull/1095))
+- **Customizable repos directory** — Set `AGITHA_REPOS_DIR` to control where Agitha clones repositories, similar to the existing `AGITHA_WORKTREES_DIR` for worktrees. Defaults to `~/.agitha/repos` when unset. ([CYPACK-1081](https://linear.app/ceedar/issue/CYPACK-1081), [#1104](https://github.com/apokusin/agitha/pull/1104))
+- **Network egress sandboxing** — Agent sessions can now route all network traffic through a local egress proxy for domain filtering, request logging, and per-domain header injection (credentials brokering). Enable with `sandbox.enabled: true` in `~/.agitha/config.json`. When enabled, Bash commands are restricted to writing only within the session worktree directory — no writes to any other path on disk. Supports TLS termination for domains with transform rules, following the Vercel Sandbox Firewall interface. Sandbox network ports are passed to each Claude Agent SDK session automatically. ([CYPACK-1066](https://linear.app/ceedar/issue/CYPACK-1066), [#1095](https://github.com/apokusin/agitha/pull/1095))
 - **`"trusted"` network policy preset** — Set `networkPolicy.preset: "trusted"` to pre-populate the sandbox allow list with ~200 domains matching Claude Code on the web's default allowlist (package registries, version control, container registries, cloud platforms, dev tools, monitoring). Custom `allow` rules merge on top. ([CYPACK-1066](https://linear.app/ceedar/issue/CYPACK-1066))
 
 ### Changed
-- **Refreshed Claude Code tool allowance lists** — Updated all tool permission presets (`availableTools`, `readOnlyTools`, `writeTools`, `getSafeTools`, `getCoordinatorTools`) to match the latest Claude Code SDK tool set (30 tools). Adds new tools like `Glob`, `Grep`, `Write`, `SendMessage`, `EnterPlanMode`, `EnterWorktree`, cron/scheduling tools, MCP resource tools, and team management tools. Removes deprecated `TodoRead`, `NotebookRead`, and `Batch`. Tool names no longer use glob patterns (`Read` instead of `Read(**)`). ([CYPACK-1067](https://linear.app/ceedar/issue/CYPACK-1067), [#1096](https://github.com/ceedaragents/agitha/pull/1096))
+- **Refreshed Claude Code tool allowance lists** — Updated all tool permission presets (`availableTools`, `readOnlyTools`, `writeTools`, `getSafeTools`, `getCoordinatorTools`) to match the latest Claude Code SDK tool set (30 tools). Adds new tools like `Glob`, `Grep`, `Write`, `SendMessage`, `EnterPlanMode`, `EnterWorktree`, cron/scheduling tools, MCP resource tools, and team management tools. Removes deprecated `TodoRead`, `NotebookRead`, and `Batch`. Tool names no longer use glob patterns (`Read` instead of `Read(**)`). ([CYPACK-1067](https://linear.app/ceedar/issue/CYPACK-1067), [#1096](https://github.com/apokusin/agitha/pull/1096))
 - **Agent subprocess credential scrubbing** — Agent sessions set `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` so the SDK automatically strips authentication credentials (API keys, OAuth tokens) from Bash subprocess environments. Auth tokens are forwarded to the SDK process for API calls but cannot be accessed by tool-spawned commands. The parent process environment (`process.env`) is no longer inherited by agent sessions — only `PATH` and auth credentials are forwarded, alongside the repository's own `.env` variables and per-session env vars (CA certs, Agitha flags). ([CYPACK-1066](https://linear.app/ceedar/issue/CYPACK-1066))
-- **Webhook IP provenance validation** — Incoming webhooks from Linear, GitHub, and GitLab are now validated against each provider's known source IP ranges. Enabled automatically in self-hosted mode (`AGITHA_HOST_EXTERNAL=true`); can be toggled with the `WEBHOOK_IP_VALIDATION` environment variable. GitHub CIDRs are refreshed from the `/meta` API on startup. ([CYPACK-1056](https://linear.app/ceedar/issue/CYPACK-1056), [#1094](https://github.com/ceedaragents/agitha/pull/1094))
+- **Webhook IP provenance validation** — Incoming webhooks from Linear, GitHub, and GitLab are now validated against each provider's known source IP ranges. Enabled automatically in self-hosted mode (`AGITHA_HOST_EXTERNAL=true`); can be toggled with the `WEBHOOK_IP_VALIDATION` environment variable. GitHub CIDRs are refreshed from the `/meta` API on startup. ([CYPACK-1056](https://linear.app/ceedar/issue/CYPACK-1056), [#1094](https://github.com/apokusin/agitha/pull/1094))
 
 ### Fixed
-- **Changelog updates no longer create duplicate entries** — The PR/MR and changelog-update skills now diff entries against the base branch instead of only the last commit, correctly detecting entries already added by the current branch and updating them in-place. ([CYPACK-1063](https://linear.app/ceedar/issue/CYPACK-1063), [#1091](https://github.com/ceedaragents/agitha/pull/1091))
+- **Changelog updates no longer create duplicate entries** — The PR/MR and changelog-update skills now diff entries against the base branch instead of only the last commit, correctly detecting entries already added by the current branch and updating them in-place. ([CYPACK-1063](https://linear.app/ceedar/issue/CYPACK-1063), [#1091](https://github.com/apokusin/agitha/pull/1091))
 - **Agent sessions no longer fail with "executable not found" in pnpm monorepos** — The Claude Agent SDK's internal path resolution fails in pnpm's symlinked `node_modules`. Agitha now explicitly resolves the SDK executable path using Node's module resolution, and passes `PATH` to the child process so the `node` binary can be found. ([CYPACK-1066](https://linear.app/ceedar/issue/CYPACK-1066))
 
 ### Packages
@@ -794,8 +794,8 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.44] - 2026-04-10
 
 ### Fixed
-- **Repository `.env` variables are now scoped per-session** — Previously, `.env` files were loaded into the EdgeWorker's `process.env`, causing environment poisoning across sessions and repositories. Variables are now parsed into an isolated object and merged only into the child subprocess env, so updated or removed values take effect immediately and one repo's `.env` cannot leak into another. ([CYPACK-1059](https://linear.app/ceedar/issue/CYPACK-1059), [#1086](https://github.com/ceedaragents/agitha/pull/1086))
-- **PR/MR interaction tips now correctly reference `@agithaagent`** — Previously, when `GITHUB_BOT_USERNAME` or `GITLAB_BOT_USERNAME` environment variables were not set, PR/MR descriptions could show an incorrect bot username. The system now defaults to `agithaagent`. ([CYPACK-1054](https://linear.app/ceedar/issue/CYPACK-1054), [#1082](https://github.com/ceedaragents/agitha/pull/1082))
+- **Repository `.env` variables are now scoped per-session** — Previously, `.env` files were loaded into the EdgeWorker's `process.env`, causing environment poisoning across sessions and repositories. Variables are now parsed into an isolated object and merged only into the child subprocess env, so updated or removed values take effect immediately and one repo's `.env` cannot leak into another. ([CYPACK-1059](https://linear.app/ceedar/issue/CYPACK-1059), [#1086](https://github.com/apokusin/agitha/pull/1086))
+- **PR/MR interaction tips now correctly reference `@agithaagent`** — Previously, when `GITHUB_BOT_USERNAME` or `GITLAB_BOT_USERNAME` environment variables were not set, PR/MR descriptions could show an incorrect bot username. The system now defaults to `agithaagent`. ([CYPACK-1054](https://linear.app/ceedar/issue/CYPACK-1054), [#1082](https://github.com/apokusin/agitha/pull/1082))
 
 ### Packages
 
@@ -847,7 +847,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.43] - 2026-04-08
 
 ### Fixed
-- **Slack chat sessions now see repositories added or removed at runtime** — Previously, Slack sessions used a stale snapshot of configured repositories from boot time, causing Agitha to report missing access to repos that were actually configured. New sessions now always reflect the current repository configuration. ([CYPACK-1051](https://linear.app/ceedar/issue/CYPACK-1051), [#1078](https://github.com/ceedaragents/agitha/pull/1078))
+- **Slack chat sessions now see repositories added or removed at runtime** — Previously, Slack sessions used a stale snapshot of configured repositories from boot time, causing Agitha to report missing access to repos that were actually configured. New sessions now always reflect the current repository configuration. ([CYPACK-1051](https://linear.app/ceedar/issue/CYPACK-1051), [#1078](https://github.com/apokusin/agitha/pull/1078))
 
 ### Packages
 
@@ -899,7 +899,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.42] - 2026-04-06
 
 ### Fixed
-- **Bundled skills now resolve correctly for npm installs** - Skills shipped with the CLI were not found when installed via npm because symlinks were stripped during publishing. Skills are now resolved from the correct compiled path. ([CYPACK-1046](https://linear.app/ceedar/issue/CYPACK-1046), [#1073](https://github.com/ceedaragents/agitha/pull/1073))
+- **Bundled skills now resolve correctly for npm installs** - Skills shipped with the CLI were not found when installed via npm because symlinks were stripped during publishing. Skills are now resolved from the correct compiled path. ([CYPACK-1046](https://linear.app/ceedar/issue/CYPACK-1046), [#1073](https://github.com/apokusin/agitha/pull/1073))
 
 ### Packages
 
@@ -951,7 +951,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.41] - 2026-04-06
 
 ### Changed
-- **Skills replace rigid procedure workflows** - Agent sessions now use flexible, customizable skills instead of fixed procedure sequences. Skills are discoverable at runtime, giving the agent more natural control over its workflow. A Stop hook ensures PRs and summaries are always created before sessions end. Users can add custom skills to `~/.agitha/skills/`. ([CYPACK-996](https://linear.app/ceedar/issue/CYPACK-996), [#1018](https://github.com/ceedaragents/agitha/pull/1018))
+- **Skills replace rigid procedure workflows** - Agent sessions now use flexible, customizable skills instead of fixed procedure sequences. Skills are discoverable at runtime, giving the agent more natural control over its workflow. A Stop hook ensures PRs and summaries are always created before sessions end. Users can add custom skills to `~/.agitha/skills/`. ([CYPACK-996](https://linear.app/ceedar/issue/CYPACK-996), [#1018](https://github.com/apokusin/agitha/pull/1018))
 
 ### Packages
 
@@ -1003,16 +1003,16 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.40] - 2026-04-02
 
 ### Fixed
-- **Slack chat sessions now use fresh Linear tokens** - The Linear MCP connection in Slack chat sessions was using a token captured once at startup, so after a daily OAuth refresh new sessions would fail to reach Linear. Chat sessions now build fresh MCP config per session, matching how issue sessions already work. ([CYPACK-1029](https://linear.app/ceedar/issue/CYPACK-1029), [#1063](https://github.com/ceedaragents/agitha/pull/1063))
-- **Logger tests updated for ISO timestamp output** - Fixed test failures caused by the ISO timestamp addition to log output in v0.2.39. Tests in `core` and `claude-runner` now correctly match the timestamped log format. ([CYPACK-1027](https://linear.app/ceedar/issue/CYPACK-1027), [#1060](https://github.com/ceedaragents/agitha/pull/1060))
+- **Slack chat sessions now use fresh Linear tokens** - The Linear MCP connection in Slack chat sessions was using a token captured once at startup, so after a daily OAuth refresh new sessions would fail to reach Linear. Chat sessions now build fresh MCP config per session, matching how issue sessions already work. ([CYPACK-1029](https://linear.app/ceedar/issue/CYPACK-1029), [#1063](https://github.com/apokusin/agitha/pull/1063))
+- **Logger tests updated for ISO timestamp output** - Fixed test failures caused by the ISO timestamp addition to log output in v0.2.39. Tests in `core` and `claude-runner` now correctly match the timestamped log format. ([CYPACK-1027](https://linear.app/ceedar/issue/CYPACK-1027), [#1060](https://github.com/apokusin/agitha/pull/1060))
 
 ### Changed
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.90 and `@anthropic-ai/sdk` to v0.82.0** - Upgrades from v0.2.89 / v0.81.0. v0.2.90 syncs with Claude Code v2.1.90. v0.82.0 adds structured `stop_details` to message responses and AWS Bedrock SDK API key support. See changelogs: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md), [anthropic-sdk](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1028](https://linear.app/ceedar/issue/CYPACK-1028), [#1062](https://github.com/ceedaragents/agitha/pull/1062))
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.89 and `@anthropic-ai/sdk` to v0.81.0** - Upgrades from v0.2.87 / v0.80.0. v0.2.89 adds `startup()` for ~20x faster first queries, `listSubagents()` / `getSubagentMessages()` for subagent conversation history, fixes Zod v4 schema metadata being dropped, and fixes `side_question` returning null on resume. v0.81.0 adds `.type` field to `APIError` for error kind identification. See changelogs: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md), [anthropic-sdk](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1026](https://linear.app/ceedar/issue/CYPACK-1026), [#1058](https://github.com/ceedaragents/agitha/pull/1058))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.90 and `@anthropic-ai/sdk` to v0.82.0** - Upgrades from v0.2.89 / v0.81.0. v0.2.90 syncs with Claude Code v2.1.90. v0.82.0 adds structured `stop_details` to message responses and AWS Bedrock SDK API key support. See changelogs: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md), [anthropic-sdk](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1028](https://linear.app/ceedar/issue/CYPACK-1028), [#1062](https://github.com/apokusin/agitha/pull/1062))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.89 and `@anthropic-ai/sdk` to v0.81.0** - Upgrades from v0.2.87 / v0.80.0. v0.2.89 adds `startup()` for ~20x faster first queries, `listSubagents()` / `getSubagentMessages()` for subagent conversation history, fixes Zod v4 schema metadata being dropped, and fixes `side_question` returning null on resume. v0.81.0 adds `.type` field to `APIError` for error kind identification. See changelogs: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md), [anthropic-sdk](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1026](https://linear.app/ceedar/issue/CYPACK-1026), [#1058](https://github.com/apokusin/agitha/pull/1058))
 
 ### Added
-- **GitHub App webhook setup for self-hosted users** - Self-hosted users can now configure GitHub App webhooks during setup. ([#1054](https://github.com/ceedaragents/agitha/pull/1054))
-- **ISO timestamps in log output** - Log lines now include ISO timestamps for easier debugging and correlation. ([#1055](https://github.com/ceedaragents/agitha/pull/1055))
+- **GitHub App webhook setup for self-hosted users** - Self-hosted users can now configure GitHub App webhooks during setup. ([#1054](https://github.com/apokusin/agitha/pull/1054))
+- **ISO timestamps in log output** - Log lines now include ISO timestamps for easier debugging and correlation. ([#1055](https://github.com/apokusin/agitha/pull/1055))
 
 ### Packages
 
@@ -1064,18 +1064,18 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.39] - 2026-03-31
 
 ### Fixed
-- **Linear OAuth tokens now stay fresh across long sessions** - When Linear access tokens are refreshed (at least once daily with OAuth 2.0), running sessions and services now automatically pick up the new token instead of continuing with a stale one. ([CYPACK-1024](https://linear.app/ceedar/issue/CYPACK-1024), [#1056](https://github.com/ceedaragents/agitha/pull/1056))
-- **Self-auth now works with reverse proxies on other machines** - The self-auth OAuth callback server now respects `AGITHA_HOST_EXTERNAL=true` and listens on `0.0.0.0` instead of `localhost`, matching the main server's behavior. ([#1046](https://github.com/ceedaragents/agitha/issues/1046), [CYPACK-1017](https://linear.app/ceedar/issue/CYPACK-1017), [#1047](https://github.com/ceedaragents/agitha/pull/1047))
+- **Linear OAuth tokens now stay fresh across long sessions** - When Linear access tokens are refreshed (at least once daily with OAuth 2.0), running sessions and services now automatically pick up the new token instead of continuing with a stale one. ([CYPACK-1024](https://linear.app/ceedar/issue/CYPACK-1024), [#1056](https://github.com/apokusin/agitha/pull/1056))
+- **Self-auth now works with reverse proxies on other machines** - The self-auth OAuth callback server now respects `AGITHA_HOST_EXTERNAL=true` and listens on `0.0.0.0` instead of `localhost`, matching the main server's behavior. ([#1046](https://github.com/apokusin/agitha/issues/1046), [CYPACK-1017](https://linear.app/ceedar/issue/CYPACK-1017), [#1047](https://github.com/apokusin/agitha/pull/1047))
 
 ### Added
-- **Auto-detect base branch when adding repositories** - `agitha self-add-repo` now automatically detects the remote's default branch instead of always using `main`. Also adds a `--base-branch` flag for manual override. ([CYPACK-1015](https://linear.app/ceedar/issue/CYPACK-1015), [#1051](https://github.com/ceedaragents/agitha/pull/1051))
+- **Auto-detect base branch when adding repositories** - `agitha self-add-repo` now automatically detects the remote's default branch instead of always using `main`. Also adds a `--base-branch` flag for manual override. ([CYPACK-1015](https://linear.app/ceedar/issue/CYPACK-1015), [#1051](https://github.com/apokusin/agitha/pull/1051))
 
 ### Changed
-- **Skills replace rigid procedure workflows** - Agent sessions now use flexible, customizable skills instead of fixed procedure sequences. Skills are discoverable at runtime, giving the agent more natural control over its workflow. A Stop hook ensures PRs and summaries are always created before sessions end. Users can add custom skills to `~/.agitha/skills/`. ([CYPACK-996](https://linear.app/ceedar/issue/CYPACK-996), [#1018](https://github.com/ceedaragents/agitha/pull/1018))
-- **Renamed `agitha self-auth` to `agitha self-auth-linear`** - Clarifies that this command authenticates specifically with Linear OAuth. ([CYPACK-1017](https://linear.app/ceedar/issue/CYPACK-1017), [#1047](https://github.com/ceedaragents/agitha/pull/1047))
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.88** - Syncs with Claude Code v2.1.88. Fixes error result messages now correctly setting `is_error: true`, MCP servers no longer getting permanently stuck after a connection race, ~50% failure rate bug in `StructuredOutput` schema cache, and `ERR_STREAM_WRITE_AFTER_END` errors with single-turn queries. Also adds `includeSystemMessages` option to `getSessionMessages()` and `includeHookEvents` option for hook lifecycle messages. See SDK changelog: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1023](https://linear.app/ceedar/issue/CYPACK-1023), [#1053](https://github.com/ceedaragents/agitha/pull/1053))
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.87** - Syncs with Claude Code v2.1.87 (maintenance release). See SDK changelog: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1020](https://linear.app/ceedar/issue/CYPACK-1020), [#1050](https://github.com/ceedaragents/agitha/pull/1050))
-- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.86** - Keeps AI SDK dependency up to date. v0.2.86 adds `getContextUsage()` for token distribution visibility, makes `session_id` optional in `SDKUserMessage`, and fixes TypeScript type resolution. v0.2.85 adds `reloadPlugins()` for dynamic plugin refresh and fixes PreToolUse hooks with `"ask"` permission decisions. See SDK changelog: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1016](https://linear.app/ceedar/issue/CYPACK-1016), [#1045](https://github.com/ceedaragents/agitha/pull/1045))
+- **Skills replace rigid procedure workflows** - Agent sessions now use flexible, customizable skills instead of fixed procedure sequences. Skills are discoverable at runtime, giving the agent more natural control over its workflow. A Stop hook ensures PRs and summaries are always created before sessions end. Users can add custom skills to `~/.agitha/skills/`. ([CYPACK-996](https://linear.app/ceedar/issue/CYPACK-996), [#1018](https://github.com/apokusin/agitha/pull/1018))
+- **Renamed `agitha self-auth` to `agitha self-auth-linear`** - Clarifies that this command authenticates specifically with Linear OAuth. ([CYPACK-1017](https://linear.app/ceedar/issue/CYPACK-1017), [#1047](https://github.com/apokusin/agitha/pull/1047))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.88** - Syncs with Claude Code v2.1.88. Fixes error result messages now correctly setting `is_error: true`, MCP servers no longer getting permanently stuck after a connection race, ~50% failure rate bug in `StructuredOutput` schema cache, and `ERR_STREAM_WRITE_AFTER_END` errors with single-turn queries. Also adds `includeSystemMessages` option to `getSessionMessages()` and `includeHookEvents` option for hook lifecycle messages. See SDK changelog: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1023](https://linear.app/ceedar/issue/CYPACK-1023), [#1053](https://github.com/apokusin/agitha/pull/1053))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.87** - Syncs with Claude Code v2.1.87 (maintenance release). See SDK changelog: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1020](https://linear.app/ceedar/issue/CYPACK-1020), [#1050](https://github.com/apokusin/agitha/pull/1050))
+- **Updated `@anthropic-ai/claude-agent-sdk` to v0.2.86** - Keeps AI SDK dependency up to date. v0.2.86 adds `getContextUsage()` for token distribution visibility, makes `session_id` optional in `SDKUserMessage`, and fixes TypeScript type resolution. v0.2.85 adds `reloadPlugins()` for dynamic plugin refresh and fixes PreToolUse hooks with `"ask"` permission decisions. See SDK changelog: [claude-agent-sdk](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md). ([CYPACK-1016](https://linear.app/ceedar/issue/CYPACK-1016), [#1045](https://github.com/apokusin/agitha/pull/1045))
 
 ### Packages
 
@@ -1127,8 +1127,8 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.38] - 2026-03-25
 
 ### Added
-- **GitLab integration with `glab` CLI support** - Agitha now supports GitLab repositories alongside GitHub. Create merge requests, respond to MR comments, and handle review feedback using the `glab` CLI. Includes webhook support for receiving GitLab events, a dedicated setup skill (`/agitha-setup-gitlab`), and platform-aware subroutines that automatically use `glab` commands for GitLab-hosted repos. ([#857](https://github.com/ceedaragents/agitha/issues/857), [#1029](https://github.com/ceedaragents/agitha/pull/1029))
-- **Agitha docs MCP available in all sessions** - Agitha now has access to its own documentation via the Mintlify docs MCP server, enabling better self-reference and user guidance. ([CYPACK-995](https://linear.app/ceedar/issue/CYPACK-995), [#1016](https://github.com/ceedaragents/agitha/pull/1016))
+- **GitLab integration with `glab` CLI support** - Agitha now supports GitLab repositories alongside GitHub. Create merge requests, respond to MR comments, and handle review feedback using the `glab` CLI. Includes webhook support for receiving GitLab events, a dedicated setup skill (`/agitha-setup-gitlab`), and platform-aware subroutines that automatically use `glab` commands for GitLab-hosted repos. ([#857](https://github.com/apokusin/agitha/issues/857), [#1029](https://github.com/apokusin/agitha/pull/1029))
+- **Agitha docs MCP available in all sessions** - Agitha now has access to its own documentation via the Mintlify docs MCP server, enabling better self-reference and user guidance. ([CYPACK-995](https://linear.app/ceedar/issue/CYPACK-995), [#1016](https://github.com/apokusin/agitha/pull/1016))
 
 ### Packages
 
@@ -1180,7 +1180,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.37] - 2026-03-18
 
 ### Added
-- **Slack sessions now support user-configured MCP tools** - Slack chat sessions can now access MCP tools from user-configured `.mcp.json` files (e.g., Supabase, Stripe, Trigger.dev), not just the built-in Linear/agitha-tools/Slack MCPs. ([CYPACK-982](https://linear.app/ceedar/issue/CYPACK-982), [#1006](https://github.com/ceedaragents/agitha/pull/1006))
+- **Slack sessions now support user-configured MCP tools** - Slack chat sessions can now access MCP tools from user-configured `.mcp.json` files (e.g., Supabase, Stripe, Trigger.dev), not just the built-in Linear/agitha-tools/Slack MCPs. ([CYPACK-982](https://linear.app/ceedar/issue/CYPACK-982), [#1006](https://github.com/apokusin/agitha/pull/1006))
 
 ### Packages
 
@@ -1229,16 +1229,16 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.36] - 2026-03-17
 
 ### Added
-- **Automatic worktree cleanup on issue completion or deletion** - When a Linear issue moves to Done, Cancelled, or is deleted, worktrees are automatically deleted and any active sessions are stopped. Handles both single-repo and multi-repo layouts. ([CYPACK-961](https://linear.app/ceedar/issue/CYPACK-961), [#982](https://github.com/ceedaragents/agitha/pull/982))
+- **Automatic worktree cleanup on issue completion or deletion** - When a Linear issue moves to Done, Cancelled, or is deleted, worktrees are automatically deleted and any active sessions are stopped. Handles both single-repo and multi-repo layouts. ([CYPACK-961](https://linear.app/ceedar/issue/CYPACK-961), [#982](https://github.com/apokusin/agitha/pull/982))
 
 ### Fixed
-- **Worktree recreation after issue reopened** - Fixed a bug where worktrees were not recreated when an issue was re-prompted after being moved to Done/Cancelled. Stale git worktree entries from a previous cleanup could prevent fresh worktree creation. ([CYPACK-961](https://linear.app/ceedar/issue/CYPACK-961), [#982](https://github.com/ceedaragents/agitha/pull/982))
-- **Self-hosted onboarding improvements** - Fixed `-l` routing labels flag not working with `agitha self-add-repo`, idle mode now shows `agitha self-add-repo` guidance instead of cloud URL for self-hosted users, and `agitha self-auth` error messages now correctly point to `~/.agitha/.env` instead of `.zshrc`. ([CYPACK-967](https://linear.app/ceedar/issue/CYPACK-967), [#991](https://github.com/ceedaragents/agitha/pull/991))
-- **Security vulnerabilities resolved** - Fixed all Dependabot security alerts (1 critical, 20 high, 11 moderate, 4 low) by updating transitive dependency versions for packages including simple-git, undici, hono, minimatch, rollup, and others. ([CYPACK-973](https://linear.app/ceedar/issue/CYPACK-973), [#1000](https://github.com/ceedaragents/agitha/pull/1000))
+- **Worktree recreation after issue reopened** - Fixed a bug where worktrees were not recreated when an issue was re-prompted after being moved to Done/Cancelled. Stale git worktree entries from a previous cleanup could prevent fresh worktree creation. ([CYPACK-961](https://linear.app/ceedar/issue/CYPACK-961), [#982](https://github.com/apokusin/agitha/pull/982))
+- **Self-hosted onboarding improvements** - Fixed `-l` routing labels flag not working with `agitha self-add-repo`, idle mode now shows `agitha self-add-repo` guidance instead of cloud URL for self-hosted users, and `agitha self-auth` error messages now correctly point to `~/.agitha/.env` instead of `.zshrc`. ([CYPACK-967](https://linear.app/ceedar/issue/CYPACK-967), [#991](https://github.com/apokusin/agitha/pull/991))
+- **Security vulnerabilities resolved** - Fixed all Dependabot security alerts (1 critical, 20 high, 11 moderate, 4 low) by updating transitive dependency versions for packages including simple-git, undici, hono, minimatch, rollup, and others. ([CYPACK-973](https://linear.app/ceedar/issue/CYPACK-973), [#1000](https://github.com/apokusin/agitha/pull/1000))
 
 ### Changed
-- **PR descriptions now include interaction tips** - Pull requests created by Agitha now include a tip explaining how to @ mention the bot (configurable via `GITHUB_BOT_USERNAME`) for inline responses and how to submit "changes requested" reviews for batch feedback. ([CYPACK-974](https://linear.app/ceedar/issue/CYPACK-974), [#1001](https://github.com/ceedaragents/agitha/pull/1001))
-- **Co-authored-by attribution disabled** - Git commits no longer include the "Co-Authored-By: Claude" trailer. ([CYPACK-974](https://linear.app/ceedar/issue/CYPACK-974), [#1001](https://github.com/ceedaragents/agitha/pull/1001))
+- **PR descriptions now include interaction tips** - Pull requests created by Agitha now include a tip explaining how to @ mention the bot (configurable via `GITHUB_BOT_USERNAME`) for inline responses and how to submit "changes requested" reviews for batch feedback. ([CYPACK-974](https://linear.app/ceedar/issue/CYPACK-974), [#1001](https://github.com/apokusin/agitha/pull/1001))
+- **Co-authored-by attribution disabled** - Git commits no longer include the "Co-Authored-By: Claude" trailer. ([CYPACK-974](https://linear.app/ceedar/issue/CYPACK-974), [#1001](https://github.com/apokusin/agitha/pull/1001))
 
 ### Packages
 
@@ -1287,13 +1287,13 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.35] - 2026-03-16
 
 ### Fixed
-- **OAuth token refresh no longer stops working after first expiry** - Fixed a bug where the OAuth token refresh mechanism would permanently stop refreshing after the first successful refresh, causing all Linear API calls to fail ~24 hours later. Subsequent token expirations now correctly trigger fresh refreshes. ([CYPACK-963](https://linear.app/ceedar/issue/CYPACK-963), [#986](https://github.com/ceedaragents/agitha/pull/986))
-- **Self-auth no longer modifies repositories or shows confusing messages** - `agitha self-auth` now only saves workspace credentials and no longer auto-links repositories. Shows "Saved credentials for workspace: \<name\>" and guides users to run `agitha self-add-repo` when no repos exist. Resolves [#716](https://github.com/ceedaragents/agitha/issues/716). ([CYPACK-964](https://linear.app/ceedar/issue/CYPACK-964), [#988](https://github.com/ceedaragents/agitha/pull/988))
+- **OAuth token refresh no longer stops working after first expiry** - Fixed a bug where the OAuth token refresh mechanism would permanently stop refreshing after the first successful refresh, causing all Linear API calls to fail ~24 hours later. Subsequent token expirations now correctly trigger fresh refreshes. ([CYPACK-963](https://linear.app/ceedar/issue/CYPACK-963), [#986](https://github.com/apokusin/agitha/pull/986))
+- **Self-auth no longer modifies repositories or shows confusing messages** - `agitha self-auth` now only saves workspace credentials and no longer auto-links repositories. Shows "Saved credentials for workspace: \<name\>" and guides users to run `agitha self-add-repo` when no repos exist. Resolves [#716](https://github.com/apokusin/agitha/issues/716). ([CYPACK-964](https://linear.app/ceedar/issue/CYPACK-964), [#988](https://github.com/apokusin/agitha/pull/988))
 - **Linear webhook signature verification more reliable** - Webhook signature verification now uses the raw request body bytes instead of re-serializing JSON, preventing intermittent HMAC failures caused by key ordering or whitespace differences.
 
 ### Added
-- **Routing labels default when adding repos** - `agitha self-add-repo` now automatically sets routing labels to the repository name. Use `-l custom,labels` to override with custom comma-separated labels. ([CYPACK-963](https://linear.app/ceedar/issue/CYPACK-963), [#986](https://github.com/ceedaragents/agitha/pull/986))
-- **Cloudflare tunnel auto-starts during self-auth** - Running `agitha self-auth` now automatically starts a Cloudflare tunnel, so webhooks can reach the local agent immediately after authentication. ([#952](https://github.com/ceedaragents/agitha/pull/952))
+- **Routing labels default when adding repos** - `agitha self-add-repo` now automatically sets routing labels to the repository name. Use `-l custom,labels` to override with custom comma-separated labels. ([CYPACK-963](https://linear.app/ceedar/issue/CYPACK-963), [#986](https://github.com/apokusin/agitha/pull/986))
+- **Cloudflare tunnel auto-starts during self-auth** - Running `agitha self-auth` now automatically starts a Cloudflare tunnel, so webhooks can reach the local agent immediately after authentication. ([#952](https://github.com/apokusin/agitha/pull/952))
 
 ### Packages
 
@@ -1342,11 +1342,11 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.34] - 2026-03-13
 
 ### Fixed
-- **Slack-created issues no longer land in Triage** - Issues created from Slack conversations now default to "Backlog" status instead of potentially being set to "Triage". ([CYPACK-957](https://linear.app/ceedar/issue/CYPACK-957), [#978](https://github.com/ceedaragents/agitha/pull/978))
-- **Issue updates no longer trigger duplicate runs** - When a Linear issue title or description was updated, all idle sessions for that issue were resumed, causing multiple concurrent runs. Issue updates are now only delivered to currently running sessions via streaming input; idle sessions are no longer resumed. Duplicate webhooks are also deduplicated. ([CYPACK-954](https://linear.app/ceedar/issue/CYPACK-954), [#977](https://github.com/ceedaragents/agitha/pull/977))
+- **Slack-created issues no longer land in Triage** - Issues created from Slack conversations now default to "Backlog" status instead of potentially being set to "Triage". ([CYPACK-957](https://linear.app/ceedar/issue/CYPACK-957), [#978](https://github.com/apokusin/agitha/pull/978))
+- **Issue updates no longer trigger duplicate runs** - When a Linear issue title or description was updated, all idle sessions for that issue were resumed, causing multiple concurrent runs. Issue updates are now only delivered to currently running sessions via streaming input; idle sessions are no longer resumed. Duplicate webhooks are also deduplicated. ([CYPACK-954](https://linear.app/ceedar/issue/CYPACK-954), [#977](https://github.com/apokusin/agitha/pull/977))
 
 ### Added
-- **Multi-repo routing** - A single Linear issue can now be routed to multiple repositories. Supported syntax: `[repo=frontend]` and `[repo=backend]` as separate tags, `repo=frontend,backend` or `repos=frontend,backend` as comma-separated lists, `repo=frontend#develop` or `[repo=frontend#release/v2]` for base branch overrides, and label-based routing that matches multiple repos when their routing labels overlap. Each matched repository gets its own worktree subfolder and git context within the same session, with per-repository branch names, MCP configs, and tool permissions. ([CYPACK-911](https://linear.app/ceedar/issue/CYPACK-911), [#955](https://github.com/ceedaragents/agitha/pull/955), [#959](https://github.com/ceedaragents/agitha/pull/959), [#960](https://github.com/ceedaragents/agitha/pull/960), [#961](https://github.com/ceedaragents/agitha/pull/961), [#962](https://github.com/ceedaragents/agitha/pull/962), [#963](https://github.com/ceedaragents/agitha/pull/963), [#964](https://github.com/ceedaragents/agitha/pull/964), [#965](https://github.com/ceedaragents/agitha/pull/965))
+- **Multi-repo routing** - A single Linear issue can now be routed to multiple repositories. Supported syntax: `[repo=frontend]` and `[repo=backend]` as separate tags, `repo=frontend,backend` or `repos=frontend,backend` as comma-separated lists, `repo=frontend#develop` or `[repo=frontend#release/v2]` for base branch overrides, and label-based routing that matches multiple repos when their routing labels overlap. Each matched repository gets its own worktree subfolder and git context within the same session, with per-repository branch names, MCP configs, and tool permissions. ([CYPACK-911](https://linear.app/ceedar/issue/CYPACK-911), [#955](https://github.com/apokusin/agitha/pull/955), [#959](https://github.com/apokusin/agitha/pull/959), [#960](https://github.com/apokusin/agitha/pull/960), [#961](https://github.com/apokusin/agitha/pull/961), [#962](https://github.com/apokusin/agitha/pull/962), [#963](https://github.com/apokusin/agitha/pull/963), [#964](https://github.com/apokusin/agitha/pull/964), [#965](https://github.com/apokusin/agitha/pull/965))
 
 ### Packages
 
@@ -1395,10 +1395,10 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.33] - 2026-03-10
 
 ### Fixed
-- **MCP config files crashing ClaudeRunner sessions** - File-loaded MCP server configs (`.mcp.json`, `mcp-*.json`) that omit the `type` field for URL-based servers no longer crash sessions with 0 messages. ClaudeRunner now infers `type: "http"` when a `url` is present. ([#966](https://github.com/ceedaragents/agitha/pull/966))
+- **MCP config files crashing ClaudeRunner sessions** - File-loaded MCP server configs (`.mcp.json`, `mcp-*.json`) that omit the `type` field for URL-based servers no longer crash sessions with 0 messages. ClaudeRunner now infers `type: "http"` when a `url` is present. ([#966](https://github.com/apokusin/agitha/pull/966))
 
 ### Added
-- **Real MCP connection testing** - The MCP test endpoint now performs actual SDK connections (stdio process spawn or HTTP/SSE) and returns discovered tools, replacing the previous placeholder response. ([#966](https://github.com/ceedaragents/agitha/pull/966))
+- **Real MCP connection testing** - The MCP test endpoint now performs actual SDK connections (stdio process spawn or HTTP/SSE) and returns discovered tools, replacing the previous placeholder response. ([#966](https://github.com/apokusin/agitha/pull/966))
 
 ### Packages
 
@@ -1447,7 +1447,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.32] - 2026-03-10
 
 ### Fixed
-- **Orchestrator sub-issue results not reaching parent** - Sub-issue completion results are now correctly written back to the parent orchestrator issue. This regression was introduced in v0.2.22 by the GlobalSessionRegistry refactor (CYPACK-724), which changed the parent session lookup to read from `globalSessionRegistry` without updating the write path to match. ([CYPACK-922](https://linear.app/ceedar/issue/CYPACK-922), [#957](https://github.com/ceedaragents/agitha/pull/957))
+- **Orchestrator sub-issue results not reaching parent** - Sub-issue completion results are now correctly written back to the parent orchestrator issue. This regression was introduced in v0.2.22 by the GlobalSessionRegistry refactor (CYPACK-724), which changed the parent session lookup to read from `globalSessionRegistry` without updating the write path to match. ([CYPACK-922](https://linear.app/ceedar/issue/CYPACK-922), [#957](https://github.com/apokusin/agitha/pull/957))
 
 ### Packages
 
@@ -1496,7 +1496,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.31] - 2026-03-09
 
 ### Fixed
-- **Rate limit event handling** - Rate limit events from Claude are now properly handled instead of producing "Unknown message type" warnings in logs. ([CYPACK-895](https://linear.app/ceedar/issue/CYPACK-895), [#946](https://github.com/ceedaragents/agitha/pull/946))
+- **Rate limit event handling** - Rate limit events from Claude are now properly handled instead of producing "Unknown message type" warnings in logs. ([CYPACK-895](https://linear.app/ceedar/issue/CYPACK-895), [#946](https://github.com/apokusin/agitha/pull/946))
 
 ### Packages
 
@@ -1545,7 +1545,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.30] - 2026-03-05
 
 ### Fixed
-- **Chat session repository context and git pull guidance** - Chat sessions now receive read-only access to all configured repository paths and include explicit `git pull` instructions in their system prompt when inspecting repository source code. ([CYPACK-891](https://linear.app/ceedar/issue/CYPACK-891), [#942](https://github.com/ceedaragents/agitha/pull/942))
+- **Chat session repository context and git pull guidance** - Chat sessions now receive read-only access to all configured repository paths and include explicit `git pull` instructions in their system prompt when inspecting repository source code. ([CYPACK-891](https://linear.app/ceedar/issue/CYPACK-891), [#942](https://github.com/apokusin/agitha/pull/942))
 
 ### Packages
 
@@ -1643,7 +1643,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.28] - 2026-03-04
 
 ### Fixed
-- **Webhook verification mode now updates at runtime** - When `SLACK_SIGNING_SECRET` or `GITHUB_WEBHOOK_SECRET` environment variables are added after the process starts (along with `AGITHA_HOST_EXTERNAL=true`), Agitha now automatically switches from proxied to direct webhook verification without requiring a restart. ([CYPACK-884](https://linear.app/ceedar/issue/CYPACK-884), [#934](https://github.com/ceedaragents/agitha/pull/934))
+- **Webhook verification mode now updates at runtime** - When `SLACK_SIGNING_SECRET` or `GITHUB_WEBHOOK_SECRET` environment variables are added after the process starts (along with `AGITHA_HOST_EXTERNAL=true`), Agitha now automatically switches from proxied to direct webhook verification without requiring a restart. ([CYPACK-884](https://linear.app/ceedar/issue/CYPACK-884), [#934](https://github.com/apokusin/agitha/pull/934))
 
 ### Packages
 
@@ -1689,16 +1689,16 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 #### agitha-ai (CLI)
 - agitha-ai@0.2.28
 
-## [0.2.27] - 2026-03-04 ([#933](https://github.com/ceedaragents/agitha/pull/933))
+## [0.2.27] - 2026-03-04 ([#933](https://github.com/apokusin/agitha/pull/933))
 
 ### Added
-- **PR change request handling** - When a reviewer requests changes on a PR created by Agitha, the agent now automatically acknowledges the review and starts working on the requested changes. Supports both summary-level and line-level review comments. ([CYPACK-842](https://linear.app/ceedar/issue/CYPACK-842), [#896](https://github.com/ceedaragents/agitha/pull/896))
-- **Direct Slack webhook verification for self-hosted deployments** - Agitha can now verify Slack webhooks directly using HMAC-SHA256 signature verification when `SLACK_SIGNING_SECRET` is set, removing the need for the CYHOST proxy in self-hosted environments. Thanks to [@aniravi24](https://github.com/aniravi24) ([#829](https://github.com/ceedaragents/agitha/pull/829))
-- **GitHub bot mention filtering** - GitHub webhook handler now respects `GITHUB_BOT_USERNAME` to only trigger on `@bot` mentions and ignore its own comments, preventing infinite loops in self-hosted setups. Thanks to [@aniravi24](https://github.com/aniravi24) ([#829](https://github.com/ceedaragents/agitha/pull/829))
-- **Smarter Slack thread context** - Other bots' messages (Sentry, CI, GitHub notifications) are now preserved in Slack thread context instead of being filtered out. Only the bot's own messages are excluded. Thanks to [@aniravi24](https://github.com/aniravi24) ([#829](https://github.com/ceedaragents/agitha/pull/829))
+- **PR change request handling** - When a reviewer requests changes on a PR created by Agitha, the agent now automatically acknowledges the review and starts working on the requested changes. Supports both summary-level and line-level review comments. ([CYPACK-842](https://linear.app/ceedar/issue/CYPACK-842), [#896](https://github.com/apokusin/agitha/pull/896))
+- **Direct Slack webhook verification for self-hosted deployments** - Agitha can now verify Slack webhooks directly using HMAC-SHA256 signature verification when `SLACK_SIGNING_SECRET` is set, removing the need for the CYHOST proxy in self-hosted environments. Thanks to [@aniravi24](https://github.com/aniravi24) ([#829](https://github.com/apokusin/agitha/pull/829))
+- **GitHub bot mention filtering** - GitHub webhook handler now respects `GITHUB_BOT_USERNAME` to only trigger on `@bot` mentions and ignore its own comments, preventing infinite loops in self-hosted setups. Thanks to [@aniravi24](https://github.com/aniravi24) ([#829](https://github.com/apokusin/agitha/pull/829))
+- **Smarter Slack thread context** - Other bots' messages (Sentry, CI, GitHub notifications) are now preserved in Slack thread context instead of being filtered out. Only the bot's own messages are excluded. Thanks to [@aniravi24](https://github.com/aniravi24) ([#829](https://github.com/apokusin/agitha/pull/829))
 
 ### Fixed
-- **Slack bot token availability after runtime switch** - Fixed Slack bot token not being available when switching from cloud to self-host runtime. The token is now resolved at usage time with a fallback to `process.env`, handling cases where the env update arrives after the first webhook. ([CYPACK-842](https://linear.app/ceedar/issue/CYPACK-842), [#896](https://github.com/ceedaragents/agitha/pull/896))
+- **Slack bot token availability after runtime switch** - Fixed Slack bot token not being available when switching from cloud to self-host runtime. The token is now resolved at usage time with a fallback to `process.env`, handling cases where the env update arrives after the first webhook. ([CYPACK-842](https://linear.app/ceedar/issue/CYPACK-842), [#896](https://github.com/apokusin/agitha/pull/896))
 
 ### Packages
 
@@ -1744,13 +1744,13 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 #### agitha-ai (CLI)
 - agitha-ai@0.2.27
 
-## [0.2.26] - 2026-02-28 ([#918](https://github.com/ceedaragents/agitha/pull/918))
+## [0.2.26] - 2026-02-28 ([#918](https://github.com/apokusin/agitha/pull/918))
 
 ### Changed
-- **Updated Claude SDK dependencies** - project configs & auto memory are now shared across git worktrees of the same repository, so Claude's persistent memory works consistently across all Agitha worktrees. Updated `@anthropic-ai/claude-agent-sdk` to v0.2.63 and `@anthropic-ai/sdk` to v0.78.0. See [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-859](https://linear.app/ceedar/issue/CYPACK-859), [#917](https://github.com/ceedaragents/agitha/pull/917))
+- **Updated Claude SDK dependencies** - project configs & auto memory are now shared across git worktrees of the same repository, so Claude's persistent memory works consistently across all Agitha worktrees. Updated `@anthropic-ai/claude-agent-sdk` to v0.2.63 and `@anthropic-ai/sdk` to v0.78.0. See [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-859](https://linear.app/ceedar/issue/CYPACK-859), [#917](https://github.com/apokusin/agitha/pull/917))
 
 ### Fixed
-- **Cursor runs no longer fail on version mismatches** - Agitha no longer blocks Cursor sessions when the installed `cursor-agent` version differs from a previously tested version, and the `AGITHA_CURSOR_AGENT_VERSION` override is no longer needed. ([CYPACK-857](https://linear.app/ceedar/issue/CYPACK-857/remove-the-requirement-that-throws-this-error), [#915](https://github.com/ceedaragents/agitha/pull/915))
+- **Cursor runs no longer fail on version mismatches** - Agitha no longer blocks Cursor sessions when the installed `cursor-agent` version differs from a previously tested version, and the `AGITHA_CURSOR_AGENT_VERSION` override is no longer needed. ([CYPACK-857](https://linear.app/ceedar/issue/CYPACK-857/remove-the-requirement-that-throws-this-error), [#915](https://github.com/apokusin/agitha/pull/915))
 
 ### Packages
 
@@ -1799,8 +1799,8 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.25] - 2026-02-27
 
 ### Fixed
-- **Default runner config now applies on hot-reload** - Changing `defaultRunner`, model defaults, or other global settings in `~/.agitha/config.json` while Agitha is running now takes effect immediately, instead of being ignored until restart. ([CYPACK-856](https://linear.app/ceedar/issue/CYPACK-856), [#907](https://github.com/ceedaragents/agitha/pull/907))
-- **Codex runner no longer fails during issue classification** - When `defaultRunner` is set to `codex`, the ProcedureAnalyzer classification step no longer crashes with a reasoning effort error. Also uses structured outputs for more reliable classification responses. ([CYPACK-856](https://linear.app/ceedar/issue/CYPACK-856), [#907](https://github.com/ceedaragents/agitha/pull/907))
+- **Default runner config now applies on hot-reload** - Changing `defaultRunner`, model defaults, or other global settings in `~/.agitha/config.json` while Agitha is running now takes effect immediately, instead of being ignored until restart. ([CYPACK-856](https://linear.app/ceedar/issue/CYPACK-856), [#907](https://github.com/apokusin/agitha/pull/907))
+- **Codex runner no longer fails during issue classification** - When `defaultRunner` is set to `codex`, the ProcedureAnalyzer classification step no longer crashes with a reasoning effort error. Also uses structured outputs for more reliable classification responses. ([CYPACK-856](https://linear.app/ceedar/issue/CYPACK-856), [#907](https://github.com/apokusin/agitha/pull/907))
 
 ### Packages
 
@@ -1849,7 +1849,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.24] - 2026-02-26
 
 ### Fixed
-- **Sessions no longer appear stuck after restart** - When the system restarts or migrates, user prompts, stop signals, and other interactions that target older sessions are now recovered instead of silently dropped. Users will see clear feedback instead of a hanging state. ([CYPACK-852](https://linear.app/ceedar/issue/CYPACK-852), [#905](https://github.com/ceedaragents/agitha/pull/905))
+- **Sessions no longer appear stuck after restart** - When the system restarts or migrates, user prompts, stop signals, and other interactions that target older sessions are now recovered instead of silently dropped. Users will see clear feedback instead of a hanging state. ([CYPACK-852](https://linear.app/ceedar/issue/CYPACK-852), [#905](https://github.com/apokusin/agitha/pull/905))
 
 ### Packages
 
@@ -1898,10 +1898,10 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.23] - 2026-02-25
 
 ### Fixed
-- **`defaultRunner` config setting now works correctly** - Setting `"defaultRunner": "codex"` (or `"gemini"` / `"cursor"`) in `~/.agitha/config.json` now properly routes issues without runner-specific labels to the configured default runner, instead of always falling back to Claude. ([CYPACK-838](https://linear.app/ceedar/issue/CYPACK-838), [#892](https://github.com/ceedaragents/agitha/pull/892))
+- **`defaultRunner` config setting now works correctly** - Setting `"defaultRunner": "codex"` (or `"gemini"` / `"cursor"`) in `~/.agitha/config.json` now properly routes issues without runner-specific labels to the configured default runner, instead of always falling back to Claude. ([CYPACK-838](https://linear.app/ceedar/issue/CYPACK-838), [#892](https://github.com/apokusin/agitha/pull/892))
 
 ### Added
-- **Assignee attribution on PRs** - PR descriptions now include assignee attribution at the top. When the assignee has a linked GitHub account, they are @mentioned for a GitHub notification. When no GitHub account is linked, the assignee's Linear profile is linked instead, ensuring an audit trail for all PRs. ([CYPACK-843](https://linear.app/ceedar/issue/CYPACK-843), [#895](https://github.com/ceedaragents/agitha/pull/895))
+- **Assignee attribution on PRs** - PR descriptions now include assignee attribution at the top. When the assignee has a linked GitHub account, they are @mentioned for a GitHub notification. When no GitHub account is linked, the assignee's Linear profile is linked instead, ensuring an audit trail for all PRs. ([CYPACK-843](https://linear.app/ceedar/issue/CYPACK-843), [#895](https://github.com/apokusin/agitha/pull/895))
 
 ### Packages
 
@@ -1950,31 +1950,31 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.22] - 2026-02-20
 
 ### Added
-- **Slack MCP tools available in agent sessions** - When the `SLACK_BOT_TOKEN` environment variable is set, Slack MCP tools (`mcp__slack`) are now automatically available in Linear and Slack sessions, enabling agents to read channels, search messages, and interact with Slack workspaces. ([CYPACK-832](https://linear.app/ceedar/issue/CYPACK-832), [#884](https://github.com/ceedaragents/agitha/pull/884))
-- **Subroutine transition status messages** - Agitha now posts a status update to the Linear timeline when transitioning between sub-procedures (e.g., "Running tests, linting, and type checking...", "Creating summary..."), so users can see what Agitha is doing instead of the session appearing to hang. ([CYPACK-835](https://linear.app/ceedar/issue/CYPACK-835), [#887](https://github.com/ceedaragents/agitha/pull/887))
-- **Configurable default runner** - The default agent harness is now configurable via `defaultRunner` in `config.json` (values: `"claude"`, `"gemini"`, `"codex"`, `"cursor"`) instead of always defaulting to Claude. When only one API key is set (Claude, Gemini, Codex, or Cursor), that runner is auto-detected as the default. When multiple keys are present, set `defaultRunner` to choose which one is used for new sessions. The setting is also updateable via the config update endpoint. ([CYPACK-826](https://linear.app/ceedar/issue/CYPACK-826), [#878](https://github.com/ceedaragents/agitha/pull/878))
-- GitHub PR comment support: Agitha can now be triggered by `@agithaagent` mentions on GitHub pull request comments, creating sessions and posting replies directly on PRs. ([CYPACK-772](https://linear.app/ceedar/issue/CYPACK-772), [#820](https://github.com/ceedaragents/agitha/pull/820))
-- Slack integration: Agitha can now receive `@mention` webhooks from Slack channels and threads, enabling Slack as a new platform for triggering agent sessions. ([CYPACK-807](https://linear.app/ceedar/issue/CYPACK-807), [#861](https://github.com/ceedaragents/agitha/pull/861))
+- **Slack MCP tools available in agent sessions** - When the `SLACK_BOT_TOKEN` environment variable is set, Slack MCP tools (`mcp__slack`) are now automatically available in Linear and Slack sessions, enabling agents to read channels, search messages, and interact with Slack workspaces. ([CYPACK-832](https://linear.app/ceedar/issue/CYPACK-832), [#884](https://github.com/apokusin/agitha/pull/884))
+- **Subroutine transition status messages** - Agitha now posts a status update to the Linear timeline when transitioning between sub-procedures (e.g., "Running tests, linting, and type checking...", "Creating summary..."), so users can see what Agitha is doing instead of the session appearing to hang. ([CYPACK-835](https://linear.app/ceedar/issue/CYPACK-835), [#887](https://github.com/apokusin/agitha/pull/887))
+- **Configurable default runner** - The default agent harness is now configurable via `defaultRunner` in `config.json` (values: `"claude"`, `"gemini"`, `"codex"`, `"cursor"`) instead of always defaulting to Claude. When only one API key is set (Claude, Gemini, Codex, or Cursor), that runner is auto-detected as the default. When multiple keys are present, set `defaultRunner` to choose which one is used for new sessions. The setting is also updateable via the config update endpoint. ([CYPACK-826](https://linear.app/ceedar/issue/CYPACK-826), [#878](https://github.com/apokusin/agitha/pull/878))
+- GitHub PR comment support: Agitha can now be triggered by `@agithaagent` mentions on GitHub pull request comments, creating sessions and posting replies directly on PRs. ([CYPACK-772](https://linear.app/ceedar/issue/CYPACK-772), [#820](https://github.com/apokusin/agitha/pull/820))
+- Slack integration: Agitha can now receive `@mention` webhooks from Slack channels and threads, enabling Slack as a new platform for triggering agent sessions. ([CYPACK-807](https://linear.app/ceedar/issue/CYPACK-807), [#861](https://github.com/apokusin/agitha/pull/861))
 
 ### Changed
-- **Slack responses now use proper mrkdwn formatting** - Slack sessions now instruct the agent to use Slack's native mrkdwn syntax instead of standard Markdown, ensuring bold, italic, links, and code blocks render correctly in Slack messages. ([CYPACK-834](https://linear.app/ceedar/issue/CYPACK-834), [#886](https://github.com/ceedaragents/agitha/pull/886))
-- **OpenAI tools now auto-detected from environment** - GPT Image and Sora video generation tools are now automatically available when the `OPENAI_API_KEY` environment variable is set, instead of requiring `openaiApiKey` in repository config. The `openaiApiKey` and `openaiOutputDirectory` config fields have been removed. ([CYPACK-831](https://linear.app/ceedar/issue/CYPACK-831), [#883](https://github.com/ceedaragents/agitha/pull/883))
-- **Updated Claude SDK dependencies** - Updated `@anthropic-ai/claude-agent-sdk` to v0.2.47 and `@anthropic-ai/sdk` to v0.77.0, adding Claude Sonnet 4.6 support, new `promptSuggestion()` method, and improved memory usage for large shell outputs. See [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-827](https://linear.app/ceedar/issue/CYPACK-827), [#880](https://github.com/ceedaragents/agitha/pull/880))
-- Slack bot token is now read exclusively from the `SLACK_BOT_TOKEN` environment variable. The `X-Slack-Bot-Token` HTTP header is no longer supported. ([CYPACK-824](https://linear.app/ceedar/issue/CYPACK-824), [#876](https://github.com/ceedaragents/agitha/pull/876))
-- Slack agent sessions now run in transient empty directories instead of git worktrees, and subsequent @mentions in the same thread share the same session context. ([CYPACK-815](https://linear.app/ceedar/issue/CYPACK-815), [#868](https://github.com/ceedaragents/agitha/pull/868))
-- **Agent and model selectors now work across Claude, Gemini, and Codex** - You can now set runner and model directly in issue descriptions using `[agent=claude|gemini|codex]` and `[model=<model-name>]`. This is not Codex-only: selectors apply to all supported runners. `[agent=...]` explicitly selects the runner, `[model=...]` selects the model and can infer runner family, and description tags take precedence over labels. ([#850](https://github.com/ceedaragents/agitha/pull/850))
-- **Codex tool activity is now visible in Linear sessions** - Codex runs now emit tool lifecycle activity (including command execution, file edits, web fetch/search, MCP tool calls, and todo updates) so activity streams show execution details instead of only final output. ([#850](https://github.com/ceedaragents/agitha/pull/850))
-- **Codex todo output now renders as proper checklists** - Todo items are now formatted as markdown task lists (`- [ ]` and `- [x]`) for correct checklist rendering in Linear. ([#850](https://github.com/ceedaragents/agitha/pull/850))
-- **Major new feature: Cursor agent harness support** - Agitha now supports Cursor as a first-class agent option. To use it, set `[agent=cursor]` in the issue description or apply a `cursor` issue label; either selector runs end-to-end with the Cursor runner and posts the final response back to the issue thread. Cursor runs now map Agitha tool permissions into project-level Cursor CLI permissions, pre-enable configured MCP servers before run, and refresh permissions between subroutines so permission changes take effect without restarting the issue flow. Cursor sandbox is enabled by default for tool execution isolation; set `AGITHA_SANDBOX=disabled` to disable. Before each run, Agitha validates that the installed `cursor-agent` version matches the tested version; a mismatch posts an error to Linear. Set `AGITHA_CURSOR_AGENT_VERSION` to your installed version to override. Assembled cursor-agent CLI args are now logged to console and session log files for debugging. Codex default runner model is now `gpt-5.3-codex` (configurable via `codexDefaultModel`). ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/ceedaragents/agitha/pull/858))
-- **Agitha MCP tools now run on the built-in server endpoint with authenticated Codex access** - Agitha tools are now served via Fastify MCP on the same configured server port, agitha-tools MCP requests require `Authorization: Bearer <AGITHA_API_KEY>`, and Codex now forwards configured MCP HTTP auth headers correctly so authenticated MCP servers initialize successfully. ([CYPACK-817](https://linear.app/ceedar/issue/CYPACK-817), [#870](https://github.com/ceedaragents/agitha/pull/870))
+- **Slack responses now use proper mrkdwn formatting** - Slack sessions now instruct the agent to use Slack's native mrkdwn syntax instead of standard Markdown, ensuring bold, italic, links, and code blocks render correctly in Slack messages. ([CYPACK-834](https://linear.app/ceedar/issue/CYPACK-834), [#886](https://github.com/apokusin/agitha/pull/886))
+- **OpenAI tools now auto-detected from environment** - GPT Image and Sora video generation tools are now automatically available when the `OPENAI_API_KEY` environment variable is set, instead of requiring `openaiApiKey` in repository config. The `openaiApiKey` and `openaiOutputDirectory` config fields have been removed. ([CYPACK-831](https://linear.app/ceedar/issue/CYPACK-831), [#883](https://github.com/apokusin/agitha/pull/883))
+- **Updated Claude SDK dependencies** - Updated `@anthropic-ai/claude-agent-sdk` to v0.2.47 and `@anthropic-ai/sdk` to v0.77.0, adding Claude Sonnet 4.6 support, new `promptSuggestion()` method, and improved memory usage for large shell outputs. See [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md) for details. ([CYPACK-827](https://linear.app/ceedar/issue/CYPACK-827), [#880](https://github.com/apokusin/agitha/pull/880))
+- Slack bot token is now read exclusively from the `SLACK_BOT_TOKEN` environment variable. The `X-Slack-Bot-Token` HTTP header is no longer supported. ([CYPACK-824](https://linear.app/ceedar/issue/CYPACK-824), [#876](https://github.com/apokusin/agitha/pull/876))
+- Slack agent sessions now run in transient empty directories instead of git worktrees, and subsequent @mentions in the same thread share the same session context. ([CYPACK-815](https://linear.app/ceedar/issue/CYPACK-815), [#868](https://github.com/apokusin/agitha/pull/868))
+- **Agent and model selectors now work across Claude, Gemini, and Codex** - You can now set runner and model directly in issue descriptions using `[agent=claude|gemini|codex]` and `[model=<model-name>]`. This is not Codex-only: selectors apply to all supported runners. `[agent=...]` explicitly selects the runner, `[model=...]` selects the model and can infer runner family, and description tags take precedence over labels. ([#850](https://github.com/apokusin/agitha/pull/850))
+- **Codex tool activity is now visible in Linear sessions** - Codex runs now emit tool lifecycle activity (including command execution, file edits, web fetch/search, MCP tool calls, and todo updates) so activity streams show execution details instead of only final output. ([#850](https://github.com/apokusin/agitha/pull/850))
+- **Codex todo output now renders as proper checklists** - Todo items are now formatted as markdown task lists (`- [ ]` and `- [x]`) for correct checklist rendering in Linear. ([#850](https://github.com/apokusin/agitha/pull/850))
+- **Major new feature: Cursor agent harness support** - Agitha now supports Cursor as a first-class agent option. To use it, set `[agent=cursor]` in the issue description or apply a `cursor` issue label; either selector runs end-to-end with the Cursor runner and posts the final response back to the issue thread. Cursor runs now map Agitha tool permissions into project-level Cursor CLI permissions, pre-enable configured MCP servers before run, and refresh permissions between subroutines so permission changes take effect without restarting the issue flow. Cursor sandbox is enabled by default for tool execution isolation; set `AGITHA_SANDBOX=disabled` to disable. Before each run, Agitha validates that the installed `cursor-agent` version matches the tested version; a mismatch posts an error to Linear. Set `AGITHA_CURSOR_AGENT_VERSION` to your installed version to override. Assembled cursor-agent CLI args are now logged to console and session log files for debugging. Codex default runner model is now `gpt-5.3-codex` (configurable via `codexDefaultModel`). ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/apokusin/agitha/pull/858))
+- **Agitha MCP tools now run on the built-in server endpoint with authenticated Codex access** - Agitha tools are now served via Fastify MCP on the same configured server port, agitha-tools MCP requests require `Authorization: Bearer <AGITHA_API_KEY>`, and Codex now forwards configured MCP HTTP auth headers correctly so authenticated MCP servers initialize successfully. ([CYPACK-817](https://linear.app/ceedar/issue/CYPACK-817), [#870](https://github.com/apokusin/agitha/pull/870))
 
 ### Fixed
-- Summary subroutines now properly disable all tools including MCP tools like Linear's create_comment ([#808](https://github.com/ceedaragents/agitha/pull/808))
-- Procedures no longer fail when a subroutine exits with an error (e.g., hitting the max turns limit). Agitha now recovers by using the last successful subroutine's result, allowing the workflow to continue to completion instead of stopping mid-procedure ([#818](https://github.com/ceedaragents/agitha/pull/818))
-- **Codex usage limit errors now display full message in Linear** - When Codex hits usage limits or other turn.failed errors, the actual error message is now posted to Linear agent activity instead of a generic message. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/ceedaragents/agitha/pull/858))
-- **Cursor project .cursor/cli.json is now backed up and restored** - CursorRunner no longer overwrites the project's `.cursor/cli.json`. It temporarily renames the existing file before writing Agitha permissions, then restores the original when the session ends. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/ceedaragents/agitha/pull/858))
-- **Cursor API key no longer in CLI args or logs** - The Cursor API key is now passed only via the `CURSOR_API_KEY` environment variable, so it never appears in spawn logs or terminal output. The `--force` option has also been removed from cursor-agent invocations. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/ceedaragents/agitha/pull/858))
-- **Cursor completed todos now display as checked in Linear** - Cursor API uses `TODO_STATUS_COMPLETED` for completed todo items; the formatter now recognizes this so completed items render as `- [x]` instead of `- [ ]` in Linear activity. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/ceedaragents/agitha/pull/858))
+- Summary subroutines now properly disable all tools including MCP tools like Linear's create_comment ([#808](https://github.com/apokusin/agitha/pull/808))
+- Procedures no longer fail when a subroutine exits with an error (e.g., hitting the max turns limit). Agitha now recovers by using the last successful subroutine's result, allowing the workflow to continue to completion instead of stopping mid-procedure ([#818](https://github.com/apokusin/agitha/pull/818))
+- **Codex usage limit errors now display full message in Linear** - When Codex hits usage limits or other turn.failed errors, the actual error message is now posted to Linear agent activity instead of a generic message. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/apokusin/agitha/pull/858))
+- **Cursor project .cursor/cli.json is now backed up and restored** - CursorRunner no longer overwrites the project's `.cursor/cli.json`. It temporarily renames the existing file before writing Agitha permissions, then restores the original when the session ends. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/apokusin/agitha/pull/858))
+- **Cursor API key no longer in CLI args or logs** - The Cursor API key is now passed only via the `CURSOR_API_KEY` environment variable, so it never appears in spawn logs or terminal output. The `--force` option has also been removed from cursor-agent invocations. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/apokusin/agitha/pull/858))
+- **Cursor completed todos now display as checked in Linear** - Cursor API uses `TODO_STATUS_COMPLETED` for completed todo items; the formatter now recognizes this so completed items render as `- [x]` instead of `- [ ]` in Linear activity. ([CYPACK-804](https://linear.app/ceedar/issue/CYPACK-804), [#858](https://github.com/apokusin/agitha/pull/858))
 
 ### Packages
 
@@ -2023,12 +2023,12 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.21] - 2026-02-09
 
 ### Changed
-- **Updated Claude SDK dependencies** - Updated `@anthropic-ai/claude-agent-sdk` to v0.2.34 and `@anthropic-ai/sdk` to v0.73.0. See [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#v0234) for details. ([CYPACK-788](https://linear.app/ceedar/issue/CYPACK-788), [#837](https://github.com/ceedaragents/agitha/pull/837))
-- **Improved task and tool activity display** - Task creation now shows as concise checklist items instead of verbose multi-line entries, task status updates display the task name with status emoji, and tool search/background task output activities are now cleanly formatted. ([CYPACK-795](https://linear.app/ceedar/issue/CYPACK-795), [#846](https://github.com/ceedaragents/agitha/pull/846))
-- **Task status updates now show task descriptions** - Task update and task detail activities now display the task subject alongside the task number (e.g., "Task #3 — Fix login bug") instead of just the number. ([CYPACK-797](https://linear.app/ceedar/issue/CYPACK-797), [#847](https://github.com/ceedaragents/agitha/pull/847))
+- **Updated Claude SDK dependencies** - Updated `@anthropic-ai/claude-agent-sdk` to v0.2.34 and `@anthropic-ai/sdk` to v0.73.0. See [claude-agent-sdk changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#v0234) for details. ([CYPACK-788](https://linear.app/ceedar/issue/CYPACK-788), [#837](https://github.com/apokusin/agitha/pull/837))
+- **Improved task and tool activity display** - Task creation now shows as concise checklist items instead of verbose multi-line entries, task status updates display the task name with status emoji, and tool search/background task output activities are now cleanly formatted. ([CYPACK-795](https://linear.app/ceedar/issue/CYPACK-795), [#846](https://github.com/apokusin/agitha/pull/846))
+- **Task status updates now show task descriptions** - Task update and task detail activities now display the task subject alongside the task number (e.g., "Task #3 — Fix login bug") instead of just the number. ([CYPACK-797](https://linear.app/ceedar/issue/CYPACK-797), [#847](https://github.com/apokusin/agitha/pull/847))
 
 ### Fixed
-- **Procedures no longer fail when a subroutine exits with an error** - When a single-turn subroutine hits the max turns limit, Agitha now recovers by using the last successful subroutine's result, allowing the workflow to continue to completion instead of stopping mid-procedure. ([CYPACK-792](https://linear.app/ceedar/issue/CYPACK-792), [#843](https://github.com/ceedaragents/agitha/pull/843))
+- **Procedures no longer fail when a subroutine exits with an error** - When a single-turn subroutine hits the max turns limit, Agitha now recovers by using the last successful subroutine's result, allowing the workflow to continue to completion instead of stopping mid-procedure. ([CYPACK-792](https://linear.app/ceedar/issue/CYPACK-792), [#843](https://github.com/apokusin/agitha/pull/843))
 
 ### Packages
 
@@ -2062,7 +2062,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.20] - 2026-02-05
 
 ### Fixed
-- **Agent guidance for draft PRs now respected** - When your Linear workspace guidance specifies `--draft` or requests PRs remain as drafts, Agitha will no longer automatically convert them to ready for review. PRs also now correctly target the configured base branch instead of defaulting to main. ([CYPACK-784](https://linear.app/ceedar/issue/CYPACK-784), [#834](https://github.com/ceedaragents/agitha/pull/834))
+- **Agent guidance for draft PRs now respected** - When your Linear workspace guidance specifies `--draft` or requests PRs remain as drafts, Agitha will no longer automatically convert them to ready for review. PRs also now correctly target the configured base branch instead of defaulting to main. ([CYPACK-784](https://linear.app/ceedar/issue/CYPACK-784), [#834](https://github.com/apokusin/agitha/pull/834))
 
 ### Packages
 
@@ -2096,7 +2096,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.19] - 2026-01-24
 
 ### Fixed
-- Fixed configuration schema compatibility issue between agitha-hosted and local installations. ([#802](https://github.com/ceedaragents/agitha/pull/802))
+- Fixed configuration schema compatibility issue between agitha-hosted and local installations. ([#802](https://github.com/apokusin/agitha/pull/802))
 
 ### Packages
 
@@ -2161,7 +2161,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.17] - 2026-01-23
 
 ### Added
-- **Issue update awareness** - Agitha now detects when you edit an issue's title, description, or attachments while it's actively working on that issue. The agent receives context showing what changed (old vs new values) along with guidance to evaluate whether the update affects its implementation or action plan. TIP: instead of re-prompting Agitha in a comment or chat window, just update the issue description with additional acceptance criteria! It will auto-start or adjust course and apply changes. ([CYPACK-736](https://linear.app/ceedar/issue/CYPACK-736), [#782](https://github.com/ceedaragents/agitha/pull/782))
+- **Issue update awareness** - Agitha now detects when you edit an issue's title, description, or attachments while it's actively working on that issue. The agent receives context showing what changed (old vs new values) along with guidance to evaluate whether the update affects its implementation or action plan. TIP: instead of re-prompting Agitha in a comment or chat window, just update the issue description with additional acceptance criteria! It will auto-start or adjust course and apply changes. ([CYPACK-736](https://linear.app/ceedar/issue/CYPACK-736), [#782](https://github.com/apokusin/agitha/pull/782))
 
 ### Packages
 
@@ -2195,10 +2195,10 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.16] - 2026-01-23
 
 ### Added
-- **User access control** - Added the ability to whitelist or blacklist Linear users from delegating issues to Agitha. Supports blocking specific users by Linear ID or email address, allowing only specific users (allowlist mode blocks everyone not explicitly listed), configurable block behavior (silent ignore or post comment), and template variables in block messages. Blocklist is additive (global + repo), while allowlist overrides (repo replaces global). Thanks to [@tjorri](https://github.com/tjorri) for the contribution! ([#779](https://github.com/ceedaragents/agitha/pull/779))
+- **User access control** - Added the ability to whitelist or blacklist Linear users from delegating issues to Agitha. Supports blocking specific users by Linear ID or email address, allowing only specific users (allowlist mode blocks everyone not explicitly listed), configurable block behavior (silent ignore or post comment), and template variables in block messages. Blocklist is additive (global + repo), while allowlist overrides (repo replaces global). Thanks to [@tjorri](https://github.com/tjorri) for the contribution! ([#779](https://github.com/apokusin/agitha/pull/779))
 
 ### Improved
-- **Better Cloudflare tunnel error messages** - When the Cloudflare tunnel fails to connect, Agitha now provides detailed troubleshooting guidance including common causes (firewall, VPN, proxy issues) and links to connectivity prechecks documentation. This helps users quickly identify and resolve network configuration issues preventing tunnel establishment. ([CYPACK-743](https://linear.app/ceedar/issue/CYPACK-743), [#788](https://github.com/ceedaragents/agitha/pull/788))
+- **Better Cloudflare tunnel error messages** - When the Cloudflare tunnel fails to connect, Agitha now provides detailed troubleshooting guidance including common causes (firewall, VPN, proxy issues) and links to connectivity prechecks documentation. This helps users quickly identify and resolve network configuration issues preventing tunnel establishment. ([CYPACK-743](https://linear.app/ceedar/issue/CYPACK-743), [#788](https://github.com/apokusin/agitha/pull/788))
 
 ### Packages
 
@@ -2232,7 +2232,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.15] - 2026-01-16
 
 ### Added
-- **Version endpoint** - Added a `/version` endpoint that returns the Agitha CLI version, enabling the dashboard to display version information. The endpoint returns `{ "agitha_cli_version": "x.y.z" }` or `null` if unavailable. ([CYPACK-731](https://linear.app/ceedar/issue/CYPACK-731), [#775](https://github.com/ceedaragents/agitha/pull/775))
+- **Version endpoint** - Added a `/version` endpoint that returns the Agitha CLI version, enabling the dashboard to display version information. The endpoint returns `{ "agitha_cli_version": "x.y.z" }` or `null` if unavailable. ([CYPACK-731](https://linear.app/ceedar/issue/CYPACK-731), [#775](https://github.com/apokusin/agitha/pull/775))
 
 ### Packages
 
@@ -2266,8 +2266,8 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.14] - 2026-01-16
 
 ### Fixed
-- **Cross-repository orchestration** - Fixed an issue where parent sessions could not be resumed when orchestrating sub-issues across different repositories. Child sessions now correctly locate and resume their parent sessions regardless of which repository they belong to. ([CYPACK-722](https://linear.app/ceedar/issue/CYPACK-722), [#768](https://github.com/ceedaragents/agitha/pull/768))
-- **Summary subroutines no longer show extended "Working" status** - During summarization phases (concise-summary, verbose-summary, question-answer, plan-summary, user-testing-summary, release-summary), the agent no longer makes tool calls that caused users to see an extended "Working" status in Linear. The agent now produces only text output during these phases. ([CYPACK-723](https://linear.app/ceedar/issue/CYPACK-723), [#764](https://github.com/ceedaragents/agitha/pull/764))
+- **Cross-repository orchestration** - Fixed an issue where parent sessions could not be resumed when orchestrating sub-issues across different repositories. Child sessions now correctly locate and resume their parent sessions regardless of which repository they belong to. ([CYPACK-722](https://linear.app/ceedar/issue/CYPACK-722), [#768](https://github.com/apokusin/agitha/pull/768))
+- **Summary subroutines no longer show extended "Working" status** - During summarization phases (concise-summary, verbose-summary, question-answer, plan-summary, user-testing-summary, release-summary), the agent no longer makes tool calls that caused users to see an extended "Working" status in Linear. The agent now produces only text output during these phases. ([CYPACK-723](https://linear.app/ceedar/issue/CYPACK-723), [#764](https://github.com/apokusin/agitha/pull/764))
 
 ### Packages
 
@@ -2301,14 +2301,14 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.13] - 2026-01-15
 
 ### Added
-- **Multi-repository orchestration routing context** - Orchestrator prompts now receive routing context when multiple repositories are configured in the same workspace. This enables orchestrators to intelligently route sub-issues to different repositories using description tags (`[repo=org/repo-name]`), routing labels, team keys, or project keys. ([CYPACK-711](https://linear.app/ceedar/issue/CYPACK-711), [#756](https://github.com/ceedaragents/agitha/pull/756))
+- **Multi-repository orchestration routing context** - Orchestrator prompts now receive routing context when multiple repositories are configured in the same workspace. This enables orchestrators to intelligently route sub-issues to different repositories using description tags (`[repo=org/repo-name]`), routing labels, team keys, or project keys. ([CYPACK-711](https://linear.app/ceedar/issue/CYPACK-711), [#756](https://github.com/apokusin/agitha/pull/756))
 
 ### Fixed
-- **Usage limit errors now display as errors** - When hitting usage limits (rate_limit) or other SDK errors, the agent now creates an "error" type activity instead of a "thought" type, making error messages more visible to users in the Linear UI. ([CYPACK-719](https://linear.app/ceedar/issue/CYPACK-719), [#760](https://github.com/ceedaragents/agitha/pull/760))
+- **Usage limit errors now display as errors** - When hitting usage limits (rate_limit) or other SDK errors, the agent now creates an "error" type activity instead of a "thought" type, making error messages more visible to users in the Linear UI. ([CYPACK-719](https://linear.app/ceedar/issue/CYPACK-719), [#760](https://github.com/apokusin/agitha/pull/760))
 
 ### Changed
-- **Orchestrator label routing is now hardcoded** - Issues with 'orchestrator' or 'Orchestrator' labels now always route to the orchestrator procedure, regardless of EdgeConfig settings. This ensures consistent orchestrator behavior without requiring explicit configuration. ([CYPACK-715](https://linear.app/ceedar/issue/CYPACK-715), [#757](https://github.com/ceedaragents/agitha/pull/757))
-- **Updated dependencies** - Updated `@anthropic-ai/claude-agent-sdk` from 0.2.2 to 0.2.7 ([changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#027-2026-01-14)). This brings compatibility with Claude Code v2.1.7, which enables MCP tool search auto mode by default. When MCP tool descriptions exceed 10% of the context window, they are automatically deferred and discovered via the MCPSearch tool instead of being loaded upfront, reducing context usage for sessions with many MCP tools configured. ([CYPACK-716](https://linear.app/ceedar/issue/CYPACK-716), [#758](https://github.com/ceedaragents/agitha/pull/758))
+- **Orchestrator label routing is now hardcoded** - Issues with 'orchestrator' or 'Orchestrator' labels now always route to the orchestrator procedure, regardless of EdgeConfig settings. This ensures consistent orchestrator behavior without requiring explicit configuration. ([CYPACK-715](https://linear.app/ceedar/issue/CYPACK-715), [#757](https://github.com/apokusin/agitha/pull/757))
+- **Updated dependencies** - Updated `@anthropic-ai/claude-agent-sdk` from 0.2.2 to 0.2.7 ([changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#027-2026-01-14)). This brings compatibility with Claude Code v2.1.7, which enables MCP tool search auto mode by default. When MCP tool descriptions exceed 10% of the context window, they are automatically deferred and discovered via the MCPSearch tool instead of being loaded upfront, reducing context usage for sessions with many MCP tools configured. ([CYPACK-716](https://linear.app/ceedar/issue/CYPACK-716), [#758](https://github.com/apokusin/agitha/pull/758))
 
 ### Packages
 
@@ -2342,16 +2342,16 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.12] - 2026-01-09
 
 ### Fixed
-- **Case-insensitive label matching for orchestrator/debugger modes** - Label matching for orchestrator, debugger, builder, and scoper modes is now case-insensitive, matching the existing behavior of model selection. Labels like "Orchestrator" in Linear now correctly match config entries like `["orchestrator"]`. ([CYPACK-701](https://linear.app/ceedar/issue/CYPACK-701), [#746](https://github.com/ceedaragents/agitha/pull/746))
-- **Haiku model label support** - Fixed "haiku" as a supported model label for label-based model selection. Uses sonnet as fallback model for retry scenarios. ([CYPACK-701](https://linear.app/ceedar/issue/CYPACK-701), [#746](https://github.com/ceedaragents/agitha/pull/746))
+- **Case-insensitive label matching for orchestrator/debugger modes** - Label matching for orchestrator, debugger, builder, and scoper modes is now case-insensitive, matching the existing behavior of model selection. Labels like "Orchestrator" in Linear now correctly match config entries like `["orchestrator"]`. ([CYPACK-701](https://linear.app/ceedar/issue/CYPACK-701), [#746](https://github.com/apokusin/agitha/pull/746))
+- **Haiku model label support** - Fixed "haiku" as a supported model label for label-based model selection. Uses sonnet as fallback model for retry scenarios. ([CYPACK-701](https://linear.app/ceedar/issue/CYPACK-701), [#746](https://github.com/apokusin/agitha/pull/746))
 
 ### Changed
-- **Improved changelog handling** - Changelog updates now run as a separate subroutine before git operations, ensuring PR links can be included via amend. The `git-gh` subroutine has been split into `changelog-update`, `git-commit`, and `gh-pr` for better modularity. Non-changelog subroutines now explicitly avoid touching the changelog to prevent conflicts. ([CYPACK-670](https://linear.app/ceedar/issue/CYPACK-670), [#708](https://github.com/ceedaragents/agitha/pull/708))
-- **Updated dependencies** - Updated `@anthropic-ai/claude-agent-sdk` from 0.1.72 to 0.2.2 ([changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#020-2026-01-07)). Updated `zod` from 3.x to 4.3.5 to satisfy peer dependencies. Migrated from `zod-to-json-schema` to Zod v4's native `toJSONSchema()` method. ([CYPACK-700](https://linear.app/ceedar/issue/CYPACK-700), [#745](https://github.com/ceedaragents/agitha/pull/745))
+- **Improved changelog handling** - Changelog updates now run as a separate subroutine before git operations, ensuring PR links can be included via amend. The `git-gh` subroutine has been split into `changelog-update`, `git-commit`, and `gh-pr` for better modularity. Non-changelog subroutines now explicitly avoid touching the changelog to prevent conflicts. ([CYPACK-670](https://linear.app/ceedar/issue/CYPACK-670), [#708](https://github.com/apokusin/agitha/pull/708))
+- **Updated dependencies** - Updated `@anthropic-ai/claude-agent-sdk` from 0.1.72 to 0.2.2 ([changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#020-2026-01-07)). Updated `zod` from 3.x to 4.3.5 to satisfy peer dependencies. Migrated from `zod-to-json-schema` to Zod v4's native `toJSONSchema()` method. ([CYPACK-700](https://linear.app/ceedar/issue/CYPACK-700), [#745](https://github.com/apokusin/agitha/pull/745))
 
 ### Added
-- **Worktree include support** - Add `.worktreeinclude` file support to automatically copy gitignored files (like `.env`, local configs) from the main repository to new worktrees. Files must be listed in both `.worktreeinclude` AND `.gitignore` to be copied. Supports glob patterns like `.env.*` and `**/.claude/settings.local.json`. ([CYPACK-690](https://linear.app/ceedar/issue/CYPACK-690), [#734](https://github.com/ceedaragents/agitha/pull/734))
-- **Screenshot upload guidance hooks** - Agents are now guided to use `linear_upload_file` when taking screenshots, ensuring screenshots are viewable in Linear comments instead of remaining as local files. Hooks added for `playwright_screenshot`, `mcp__claude-in-chrome__computer`, `mcp__claude-in-chrome__gif_creator`, and `mcp__chrome-devtools__take_screenshot`. ([CYPACK-699](https://linear.app/ceedar/issue/CYPACK-699), [#744](https://github.com/ceedaragents/agitha/pull/744))
+- **Worktree include support** - Add `.worktreeinclude` file support to automatically copy gitignored files (like `.env`, local configs) from the main repository to new worktrees. Files must be listed in both `.worktreeinclude` AND `.gitignore` to be copied. Supports glob patterns like `.env.*` and `**/.claude/settings.local.json`. ([CYPACK-690](https://linear.app/ceedar/issue/CYPACK-690), [#734](https://github.com/apokusin/agitha/pull/734))
+- **Screenshot upload guidance hooks** - Agents are now guided to use `linear_upload_file` when taking screenshots, ensuring screenshots are viewable in Linear comments instead of remaining as local files. Hooks added for `playwright_screenshot`, `mcp__claude-in-chrome__computer`, `mcp__claude-in-chrome__gif_creator`, and `mcp__chrome-devtools__take_screenshot`. ([CYPACK-699](https://linear.app/ceedar/issue/CYPACK-699), [#744](https://github.com/apokusin/agitha/pull/744))
 
 ### Packages
 
@@ -2385,7 +2385,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.11] - 2026-01-07
 
 ### Fixed
-- **Repository tag routing now works with Linear's escaped brackets** - Fixed a bug where `[repo=...]` tags weren't recognized because Linear escapes square brackets in descriptions (e.g., `\[repo=agitha\]`). The parser now handles both escaped and unescaped formats. ([CYPACK-688](https://linear.app/ceedar/issue/CYPACK-688), [#738](https://github.com/ceedaragents/agitha/pull/738))
+- **Repository tag routing now works with Linear's escaped brackets** - Fixed a bug where `[repo=...]` tags weren't recognized because Linear escapes square brackets in descriptions (e.g., `\[repo=agitha\]`). The parser now handles both escaped and unescaped formats. ([CYPACK-688](https://linear.app/ceedar/issue/CYPACK-688), [#738](https://github.com/apokusin/agitha/pull/738))
 
 ### Packages
 
@@ -2419,7 +2419,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.10] - 2026-01-06
 
 ### Added
-- **Repository tag routing** - You can now specify which repository an issue should be routed to by adding a `[repo=...]` tag in the issue description. Supports `[repo=org/repo-name]` to match GitHub URLs, `[repo=repo-name]` to match by name, or `[repo=repo-id]` to match by ID. This takes precedence over label, project, and team-based routing. ([CYPACK-688](https://linear.app/ceedar/issue/CYPACK-688), [#732](https://github.com/ceedaragents/agitha/pull/732))
+- **Repository tag routing** - You can now specify which repository an issue should be routed to by adding a `[repo=...]` tag in the issue description. Supports `[repo=org/repo-name]` to match GitHub URLs, `[repo=repo-name]` to match by name, or `[repo=repo-id]` to match by ID. This takes precedence over label, project, and team-based routing. ([CYPACK-688](https://linear.app/ceedar/issue/CYPACK-688), [#732](https://github.com/apokusin/agitha/pull/732))
 
 ### Packages
 
@@ -2453,8 +2453,8 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.9] - 2025-12-30
 
 ### Added
-- **Repository tag routing** - You can now specify which repository an issue should be routed to by adding a `[repo=...]` tag in the issue description. Supports `[repo=org/repo-name]` to match GitHub URLs, `[repo=repo-name]` to match by name, or `[repo=repo-id]` to match by ID. This takes precedence over label, project, and team-based routing. ([CYPACK-688](https://linear.app/ceedar/issue/CYPACK-688), [#732](https://github.com/ceedaragents/agitha/pull/732))
-- **GPT Image 1.5 support** - The image-tools MCP server now supports `gpt-image-1.5`, OpenAI's latest and highest quality image generation model. You can choose between `gpt-image-1.5` (default, best quality), `gpt-image-1`, or `gpt-image-1-mini` (faster, lower cost). ([CYPACK-675](https://linear.app/ceedar/issue/CYPACK-675), [#717](https://github.com/ceedaragents/agitha/pull/717))
+- **Repository tag routing** - You can now specify which repository an issue should be routed to by adding a `[repo=...]` tag in the issue description. Supports `[repo=org/repo-name]` to match GitHub URLs, `[repo=repo-name]` to match by name, or `[repo=repo-id]` to match by ID. This takes precedence over label, project, and team-based routing. ([CYPACK-688](https://linear.app/ceedar/issue/CYPACK-688), [#732](https://github.com/apokusin/agitha/pull/732))
+- **GPT Image 1.5 support** - The image-tools MCP server now supports `gpt-image-1.5`, OpenAI's latest and highest quality image generation model. You can choose between `gpt-image-1.5` (default, best quality), `gpt-image-1`, or `gpt-image-1-mini` (faster, lower cost). ([CYPACK-675](https://linear.app/ceedar/issue/CYPACK-675), [#717](https://github.com/apokusin/agitha/pull/717))
 
 ### Packages
 
@@ -2488,11 +2488,11 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.8] - 2025-12-28
 
 ### Added
-- **Release procedure** - Added a new `release` procedure with two subroutines for executing software releases. When an issue is classified as a release request, Agitha will: (1) check for a release skill in the project, (2) check CLAUDE.md or README.md for release instructions, or (3) ask the user via AskUserQuestion how to perform the release. This enables Agitha to handle release workflows for any project type. ([CYPACK-668](https://linear.app/ceedar/issue/CYPACK-668), [#706](https://github.com/ceedaragents/agitha/pull/706))
-- **Self-hosting OAuth commands** - New CLI commands for self-hosted deployments: `agitha self-auth` performs direct Linear OAuth authorization without a proxy, and `agitha self-add-repo` clones repositories and adds them to config with inherited workspace credentials. Both commands support the `--agitha-home` flag for custom configuration directories. See the [Self-Hosting Guide](./docs/SELF_HOSTING.md) for setup instructions. Based on the [original OAuth implementation](https://github.com/grandmore/agitha-self-hosting/pull/1) contributed by Stuart and the Grandmore team. ([CYPACK-669](https://linear.app/ceedar/issue/CYPACK-669), [#707](https://github.com/ceedaragents/agitha/pull/707))
+- **Release procedure** - Added a new `release` procedure with two subroutines for executing software releases. When an issue is classified as a release request, Agitha will: (1) check for a release skill in the project, (2) check CLAUDE.md or README.md for release instructions, or (3) ask the user via AskUserQuestion how to perform the release. This enables Agitha to handle release workflows for any project type. ([CYPACK-668](https://linear.app/ceedar/issue/CYPACK-668), [#706](https://github.com/apokusin/agitha/pull/706))
+- **Self-hosting OAuth commands** - New CLI commands for self-hosted deployments: `agitha self-auth` performs direct Linear OAuth authorization without a proxy, and `agitha self-add-repo` clones repositories and adds them to config with inherited workspace credentials. Both commands support the `--agitha-home` flag for custom configuration directories. See the [Self-Hosting Guide](./docs/SELF_HOSTING.md) for setup instructions. Based on the [original OAuth implementation](https://github.com/grandmore/agitha-self-hosting/pull/1) contributed by Stuart and the Grandmore team. ([CYPACK-669](https://linear.app/ceedar/issue/CYPACK-669), [#707](https://github.com/apokusin/agitha/pull/707))
 
 ### Changed
-- **Documentation restructured** - Moved self-hosting documentation from `selfhosting/` folder to `docs/` with separate files: `SELF_HOSTING.md` (main guide), `CONFIG_FILE.md` (configuration reference), and `CLOUDFLARE_TUNNEL.md` (optional tunnel setup). Main README now links to these docs. ([CYPACK-669](https://linear.app/ceedar/issue/CYPACK-669), [#707](https://github.com/ceedaragents/agitha/pull/707))
+- **Documentation restructured** - Moved self-hosting documentation from `selfhosting/` folder to `docs/` with separate files: `SELF_HOSTING.md` (main guide), `CONFIG_FILE.md` (configuration reference), and `CLOUDFLARE_TUNNEL.md` (optional tunnel setup). Main README now links to these docs. ([CYPACK-669](https://linear.app/ceedar/issue/CYPACK-669), [#707](https://github.com/apokusin/agitha/pull/707))
 
 ### Packages
 
@@ -2526,7 +2526,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.7] - 2025-12-28
 
 ### Fixed
-- **AskUserQuestion UI cleanup** - The AskUserQuestion tool no longer appears as raw JSON in Linear's activity stream. Since the tool is custom-handled via Linear's select signal elicitation, the tool call and result are now suppressed from the activity UI for a cleaner experience. ([CYPACK-654](https://linear.app/ceedar/issue/CYPACK-654), [#698](https://github.com/ceedaragents/agitha/pull/698))
+- **AskUserQuestion UI cleanup** - The AskUserQuestion tool no longer appears as raw JSON in Linear's activity stream. Since the tool is custom-handled via Linear's select signal elicitation, the tool call and result are now suppressed from the activity UI for a cleaner experience. ([CYPACK-654](https://linear.app/ceedar/issue/CYPACK-654), [#698](https://github.com/apokusin/agitha/pull/698))
 
 ### Packages
 
@@ -2564,17 +2564,17 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 - Updated `@anthropic-ai/claude-agent-sdk` from v0.1.69 to v0.1.72 to maintain parity with Claude Code v2.0.72. This update includes fixed `/context` command behavior to respect custom system prompts, improved non-streaming performance for single-turn queries, and renamed V2 session API method from `receive()` to `stream()`. See the [Claude Agent SDK changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#0172) for full details. ([CYPACK-618](https://linear.app/ceedar/issue/CYPACK-618))
 
 ### Added
-- **Interactive clarification via AskUserQuestion** - Agitha can now ask you clarifying questions during task execution using Linear's select signal. When Claude needs to make a decision with multiple valid options (e.g., which sorting algorithm, which library to use), it will present the options in Linear and wait for your selection before proceeding. This enables more interactive and accurate task completion. ([CYPACK-654](https://linear.app/ceedar/issue/CYPACK-654), [#691](https://github.com/ceedaragents/agitha/pull/691))
-- **Custom Skills support** - Agitha now supports Claude Skills, allowing you to extend Agitha with your own packaged capabilities. Create `SKILL.md` files in your project's `.claude/skills/` directory or personal `~/.claude/skills/` directory, and Agitha will automatically discover and use them when relevant. See the [Skills documentation](https://code.claude.com/docs/en/skills) for details on creating Skills. ([CYPACK-655](https://linear.app/ceedar/issue/CYPACK-655), [#690](https://github.com/ceedaragents/agitha/pull/690))
-- **Acceptance criteria validation** - The verifications subroutine now fetches the Linear issue and validates the implementation against all acceptance criteria. Failing to meet acceptance criteria counts as a failed verification, ensuring requirements are fully satisfied before proceeding to commit and PR creation. ([CYPACK-649](https://linear.app/ceedar/issue/CYPACK-649), [#687](https://github.com/ceedaragents/agitha/pull/687))
-- **Validation loop with retry logic** - When verifications fail during the full-development procedure, Agitha now automatically runs a fixer subroutine to address issues, then re-runs verification up to 4 times. Uses structured outputs with Zod schema validation for reliable pass/fail detection, with fallback parsing for Gemini compatibility. ([CYPACK-620](https://linear.app/ceedar/issue/CYPACK-620), [#666](https://github.com/ceedaragents/agitha/pull/666))
+- **Interactive clarification via AskUserQuestion** - Agitha can now ask you clarifying questions during task execution using Linear's select signal. When Claude needs to make a decision with multiple valid options (e.g., which sorting algorithm, which library to use), it will present the options in Linear and wait for your selection before proceeding. This enables more interactive and accurate task completion. ([CYPACK-654](https://linear.app/ceedar/issue/CYPACK-654), [#691](https://github.com/apokusin/agitha/pull/691))
+- **Custom Skills support** - Agitha now supports Claude Skills, allowing you to extend Agitha with your own packaged capabilities. Create `SKILL.md` files in your project's `.claude/skills/` directory or personal `~/.claude/skills/` directory, and Agitha will automatically discover and use them when relevant. See the [Skills documentation](https://code.claude.com/docs/en/skills) for details on creating Skills. ([CYPACK-655](https://linear.app/ceedar/issue/CYPACK-655), [#690](https://github.com/apokusin/agitha/pull/690))
+- **Acceptance criteria validation** - The verifications subroutine now fetches the Linear issue and validates the implementation against all acceptance criteria. Failing to meet acceptance criteria counts as a failed verification, ensuring requirements are fully satisfied before proceeding to commit and PR creation. ([CYPACK-649](https://linear.app/ceedar/issue/CYPACK-649), [#687](https://github.com/apokusin/agitha/pull/687))
+- **Validation loop with retry logic** - When verifications fail during the full-development procedure, Agitha now automatically runs a fixer subroutine to address issues, then re-runs verification up to 4 times. Uses structured outputs with Zod schema validation for reliable pass/fail detection, with fallback parsing for Gemini compatibility. ([CYPACK-620](https://linear.app/ceedar/issue/CYPACK-620), [#666](https://github.com/apokusin/agitha/pull/666))
 - **Claude in Chrome integration** - EdgeWorker now enables Chrome browser automation via the Claude Agent SDK's `--chrome` flag, providing access to browser automation tools (screenshot recording, console reading, JavaScript execution, tab management) for main Agitha sessions. Simple agent runners explicitly disable this integration to keep lightweight queries fast. ([CYPACK-618](https://linear.app/ceedar/issue/CYPACK-618))
-- **Process status endpoint** - Added `GET /status` endpoint that returns `{"status": "idle"}` or `{"status": "busy"}` to safely determine when Agitha can be restarted without interrupting active work. ([CYPACK-576](https://linear.app/ceedar/issue/CYPACK-576), [#632](https://github.com/ceedaragents/agitha/pull/632))
+- **Process status endpoint** - Added `GET /status` endpoint that returns `{"status": "idle"}` or `{"status": "busy"}` to safely determine when Agitha can be restarted without interrupting active work. ([CYPACK-576](https://linear.app/ceedar/issue/CYPACK-576), [#632](https://github.com/apokusin/agitha/pull/632))
 - **Version logging on startup** - Agitha now displays the running version when the edge worker starts, making it easier to verify which version is deployed. ([CYPACK-585](https://linear.app/ceedar/issue/CYPACK-585))
 - Added CLI platform mode support to enable in-memory issue tracking for testing and development ([CYPACK-509](https://linear.app/ceedar/issue/CYPACK-509))
 - **User testing procedure** - New "user-testing" procedure for interactive, user-driven testing sessions. When you explicitly request manual testing (e.g., "test this for me", "run user testing"), Agitha will execute tests based on your instructions and provide a comprehensive summary of results and findings. ([CYPACK-542](https://linear.app/ceedar/issue/CYPACK-542))
-- **Graphite workflow support** - Agitha now integrates with Graphite CLI for stacked PR workflows. Apply a "graphite" label to any issue to enable Graphite-aware behavior: sub-issues automatically branch from their blocking issue's branch (based on Linear's "blocked by" relationships) instead of main, and PRs are created using `gt submit`. For orchestrating complex multi-part features, apply both "graphite" and "orchestrator" labels - the orchestrator will create dependent sub-issues with proper blocking relationships that automatically stack in Graphite's dashboard. ([CYPACK-466](https://linear.app/ceedar/issue/CYPACK-466), [#577](https://github.com/ceedaragents/agitha/pull/577))
-- **Linear agent sessions MCP tools** - Added `linear_get_agent_sessions` and `linear_get_agent_session` tools to agitha-tools MCP server for retrieving agent session information from Linear. The tools support pagination, filtering, and provide comprehensive session details including timestamps, associated issues, and related entities. ([CYPACK-549](https://linear.app/ceedar/issue/CYPACK-549), [#625](https://github.com/ceedaragents/agitha/pull/625))
+- **Graphite workflow support** - Agitha now integrates with Graphite CLI for stacked PR workflows. Apply a "graphite" label to any issue to enable Graphite-aware behavior: sub-issues automatically branch from their blocking issue's branch (based on Linear's "blocked by" relationships) instead of main, and PRs are created using `gt submit`. For orchestrating complex multi-part features, apply both "graphite" and "orchestrator" labels - the orchestrator will create dependent sub-issues with proper blocking relationships that automatically stack in Graphite's dashboard. ([CYPACK-466](https://linear.app/ceedar/issue/CYPACK-466), [#577](https://github.com/apokusin/agitha/pull/577))
+- **Linear agent sessions MCP tools** - Added `linear_get_agent_sessions` and `linear_get_agent_session` tools to agitha-tools MCP server for retrieving agent session information from Linear. The tools support pagination, filtering, and provide comprehensive session details including timestamps, associated issues, and related entities. ([CYPACK-549](https://linear.app/ceedar/issue/CYPACK-549), [#625](https://github.com/apokusin/agitha/pull/625))
 
 ### Packages
 
@@ -2608,7 +2608,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.5] - 2025-12-03
 
 ### Fixed
-- Fixed Zod peer dependency mismatch in claude-runner that caused `mcp__agitha-tools__linear_agent_session_create` MCP tools to fail with `keyValidator._parse is not a function` error. Downgraded claude-runner's Zod dependency from v4.1.12 to v3.24.1 to match the Claude Agent SDK's peer dependency requirement ([CYPACK-478](https://linear.app/ceedar/issue/CYPACK-478), [#581](https://github.com/ceedaragents/agitha/pull/581))
+- Fixed Zod peer dependency mismatch in claude-runner that caused `mcp__agitha-tools__linear_agent_session_create` MCP tools to fail with `keyValidator._parse is not a function` error. Downgraded claude-runner's Zod dependency from v4.1.12 to v3.24.1 to match the Claude Agent SDK's peer dependency requirement ([CYPACK-478](https://linear.app/ceedar/issue/CYPACK-478), [#581](https://github.com/apokusin/agitha/pull/581))
 
 ### Packages
 
@@ -2676,8 +2676,8 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 - **Claude Opus 4.5 support** - Agitha now has access to [Claude Opus 4.5](https://www.anthropic.com/claude/opus), Anthropic's most intelligent model with breakthrough capabilities in complex reasoning, advanced coding, and nuanced content creation. Experience significantly improved code generation, deeper analysis, and more sophisticated problem-solving across all Agitha workflows.
 
 ### Changed
-- Updated @anthropic-ai/claude-agent-sdk from v0.1.42 to v0.1.52 - includes support for Claude Opus 4.5 and latest agent capabilities. See [@anthropic-ai/claude-agent-sdk v0.1.52 changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#0152) ([CYPACK-427](https://linear.app/ceedar/issue/CYPACK-427), [#558](https://github.com/ceedaragents/agitha/pull/558))
-- Updated @anthropic-ai/sdk from v0.69.0 to v0.71.0 - adds Claude Opus 4.5 model support with enhanced performance and capabilities. See [@anthropic-ai/sdk v0.71.0 changelog](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/CHANGELOG.md#0710-2025-11-22) ([CYPACK-427](https://linear.app/ceedar/issue/CYPACK-427), [#558](https://github.com/ceedaragents/agitha/pull/558))
+- Updated @anthropic-ai/claude-agent-sdk from v0.1.42 to v0.1.52 - includes support for Claude Opus 4.5 and latest agent capabilities. See [@anthropic-ai/claude-agent-sdk v0.1.52 changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md#0152) ([CYPACK-427](https://linear.app/ceedar/issue/CYPACK-427), [#558](https://github.com/apokusin/agitha/pull/558))
+- Updated @anthropic-ai/sdk from v0.69.0 to v0.71.0 - adds Claude Opus 4.5 model support with enhanced performance and capabilities. See [@anthropic-ai/sdk v0.71.0 changelog](https://github.com/anthropics/anthropic-sdk-typescript/blob/main/CHANGELOG.md#0710-2025-11-22) ([CYPACK-427](https://linear.app/ceedar/issue/CYPACK-427), [#558](https://github.com/apokusin/agitha/pull/558))
 
 ### Packages
 
@@ -2708,7 +2708,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 ## [0.2.2] - 2025-11-19
 
 ### Changed
-- Improved Linear agent-session tool formatting with custom formatters for better readability: Bash tool descriptions now appear in the action field with round brackets, Edit tool results display as unified diffs, and specialized parameter/result formatters for common tools (Read, Write, Grep, Glob, etc.) extract meaningful information instead of showing raw JSON (CYPACK-395, https://github.com/ceedaragents/agitha/pull/512)
+- Improved Linear agent-session tool formatting with custom formatters for better readability: Bash tool descriptions now appear in the action field with round brackets, Edit tool results display as unified diffs, and specialized parameter/result formatters for common tools (Read, Write, Grep, Glob, etc.) extract meaningful information instead of showing raw JSON (CYPACK-395, https://github.com/apokusin/agitha/pull/512)
 
 ### Packages
 
@@ -3400,7 +3400,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
   - Use case: scoper can only read files, debugger can't use Bash, builder gets full access
   - Use presets (`"readOnly"`, `"safe"`, `"all"`) or custom tool lists in your `labelPrompts` config
   - Improves security and keeps Claude focused on the right tools for each job
-  - See [Configuration docs](https://github.com/ceedaragents/agitha#configuration) for setup details
+  - See [Configuration docs](https://github.com/apokusin/agitha#configuration) for setup details
 
 ### Changed
 - Updated @anthropic-ai/claude-code from v1.0.72 to v1.0.73 for latest Claude Code improvements
@@ -3812,7 +3812,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
   - Edge worker registrations in the proxy now persist for 90 days instead of expiring after 1 hour
 
 ### Improved
-- New comments on Linear issues queue up when Agitha is already busy working, so that you can send multiple in a row ([#77](https://github.com/ceedaragents/agitha/pull/77)) (now feed into existing Claude sessions instead of killing and restarting the session
+- New comments on Linear issues queue up when Agitha is already busy working, so that you can send multiple in a row ([#77](https://github.com/apokusin/agitha/pull/77)) (now feed into existing Claude sessions instead of killing and restarting the session
 
 ### Packages
 
@@ -3828,7 +3828,7 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 - agitha-ai@0.1.21
 
 ### Added
-- Added `AGITHA_HOST_EXTERNAL` environment variable to enable external server access ([#78](https://github.com/ceedaragents/agitha/pull/78))
+- Added `AGITHA_HOST_EXTERNAL` environment variable to enable external server access ([#78](https://github.com/apokusin/agitha/pull/78))
   - Set to `true` to listen on `0.0.0.0` (all interfaces) instead of `localhost`
   - Enables Docker container deployment and external webhook access scenarios
   - Maintains backward compatibility with `localhost` as default
@@ -3850,16 +3850,16 @@ Hotfix released from the `cypack-1123` branch and forward-ported to `main`.
 - agitha-ai@0.1.19
 
 ### Added
-- Added `AGITHA_OAUTH_CALLBACK_BASE_URL` environment variable to configure OAuth callback URL (defaults to `http://localhost:3457`) ([#69](https://github.com/ceedaragents/agitha/pull/69))
+- Added `AGITHA_OAUTH_CALLBACK_BASE_URL` environment variable to configure OAuth callback URL (defaults to `http://localhost:3457`) ([#69](https://github.com/apokusin/agitha/pull/69))
 - Added `AGITHA_OAUTH_CALLBACK_PORT` environment variable to configure OAuth callback port (defaults to `3457`)
 - OAuth callback URL is now fully configurable for different deployment environments (Docker, remote development, custom domains)
 - Supports `--env-file=path` option to load environment variables from custom file
-- Added `AGITHA_BASE_URL` environment variable to configure base URL for edge workers ([#74](https://github.com/ceedaragents/agitha/pull/74))
+- Added `AGITHA_BASE_URL` environment variable to configure base URL for edge workers ([#74](https://github.com/apokusin/agitha/pull/74))
 - Added `AGITHA_WEBHOOK_PORT` environment variable to configure webhook port (defaults to random port 3000-3999)
 - Implemented shared webhook server architecture to eliminate port conflicts between multiple Linear tokens
 
 ### Changed
-- **BREAKING**: Migrated from Server-Sent Events (SSE) to webhook-only architecture ([#74](https://github.com/ceedaragents/agitha/pull/74))
+- **BREAKING**: Migrated from Server-Sent Events (SSE) to webhook-only architecture ([#74](https://github.com/apokusin/agitha/pull/74))
   - **Action Required**: Edge workers now receive webhooks instead of SSE streams
   - **Action Required**: Set `AGITHA_BASE_URL` environment variable if using custom deployment URLs (e.g., ngrok tunnel, server domain)
   - **Action Required**: Set `AGITHA_WEBHOOK_PORT=3456` environment variable to ensure consistent webhook port

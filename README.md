@@ -1,8 +1,8 @@
 # Agitha
 
 <div>
-  <a href="https://github.com/ceedaragents/agitha/actions">
-    <img src="https://github.com/ceedaragents/agitha/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://github.com/apokusin/agitha/actions">
+    <img src="https://github.com/apokusin/agitha/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
 
 </div>
@@ -22,7 +22,7 @@ Your (Claude Code|Codex|Cursor|Gemini) powered (Linear|GitHub|GitLab|Slack) agen
 Zero cost option — host everything yourself with your own Linear OAuth app, GitHub App, and Slack App. An AI-guided setup skill handles the entire onboarding: installing dependencies, configuring auth, creating integration apps, and connecting repositories — so you don't have to follow a manual guide.
 
 ```bash
-npx skills add ceedaragents/agitha -g
+npx skills add apokusin/agitha -g
 ```
 
 Then in any AI coding agent (Claude Code, Codex, Cursor, etc.):

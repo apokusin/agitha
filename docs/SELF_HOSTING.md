@@ -5,7 +5,7 @@
 If you're using any AI coding agent (Claude Code, Codex, Cursor, etc.), set up Agitha with a single command:
 
 ```bash
-npx skills add ceedaragents/agitha -g
+npx skills add apokusin/agitha -g
 ```
 
 Then in your agent:

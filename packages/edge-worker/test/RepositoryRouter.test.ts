@@ -519,7 +519,7 @@ describe("RepositoryRouter", () => {
 				const agithaRepo = env
 					.repository("repo-1", "Agitha")
 					.inWorkspace("default-workspace")
-					.withGithubUrl("https://github.com/ceedaragents/agitha")
+					.withGithubUrl("https://github.com/apokusin/agitha")
 					.build();
 
 				const otherRepo = env
@@ -531,7 +531,7 @@ describe("RepositoryRouter", () => {
 				// Issue has description with repo tag
 				env.issueHasDescription(
 					"issue-1",
-					"Please fix this bug in [repo=ceedaragents/agitha]\n\nMore details here.",
+					"Please fix this bug in [repo=apokusin/agitha]\n\nMore details here.",
 				);
 
 				const webhook = env

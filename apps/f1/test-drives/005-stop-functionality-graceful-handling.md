@@ -104,4 +104,4 @@ AGITHA_PORT=3650 ./f1 stop-session --session-id session-1
 
 ## PR
 
-https://github.com/ceedaragents/agitha/pull/686
+https://github.com/apokusin/agitha/pull/686

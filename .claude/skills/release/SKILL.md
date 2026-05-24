@@ -127,7 +127,7 @@ gh pr create --title "Release v0.1.XX" --body "$(cat <<'EOF'
 - Package versions bumped to 0.1.XX
 
 ## Links
-- [GitHub Release](https://github.com/ceedaragents/agitha/releases/tag/v0.1.XX)
+- [GitHub Release](https://github.com/apokusin/agitha/releases/tag/v0.1.XX)
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF

@@ -183,7 +183,7 @@ export class SharedApplicationServer {
 				if (connectionCount < requiredConnections) {
 					reject(
 						new Error(
-							`Timeout waiting for Cloudflare tunnel (${connectionCount}/${requiredConnections} connections). This is usually caused by firewall/VPN/proxy blocking cloudflared. See troubleshooting: https://github.com/ceedaragents/agitha/blob/main/docs/CLOUDFLARE_TUNNEL.md#troubleshooting`,
+							`Timeout waiting for Cloudflare tunnel (${connectionCount}/${requiredConnections} connections). This is usually caused by firewall/VPN/proxy blocking cloudflared. See troubleshooting: https://github.com/apokusin/agitha/blob/main/docs/CLOUDFLARE_TUNNEL.md#troubleshooting`,
 						),
 					);
 				}

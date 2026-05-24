@@ -3,7 +3,7 @@
 **Date**: 2025-12-17
 **Goal**: Validate the validation loop implementation by forcing a controlled failure scenario
 **Scope**: Large - Testing full validation loop cycle (fail → fixer → retry → pass)
-**PR**: https://github.com/ceedaragents/agitha/pull/666
+**PR**: https://github.com/apokusin/agitha/pull/666
 
 ---
 

@@ -69,7 +69,7 @@ Wait for page to load. Take a screenshot to verify you're on the right page and 
 ```bash
 agent-browser fill "input[name='name']" "<AGENT_NAME>"
 agent-browser fill "input[name='developerName']" "Self-hosted"
-agent-browser fill "input[name='developerUrl']" "https://github.com/ceedaragents/agitha"
+agent-browser fill "input[name='developerUrl']" "https://github.com/apokusin/agitha"
 ```
 
 For the callback URL field:
@@ -112,7 +112,7 @@ Guide the user through manual creation:
 > 2. Fill in the form:
 >    - **Application name:** `<AGENT_NAME>`
 >    - **Developer name:** Your name or org
->    - **Developer URL:** `https://github.com/ceedaragents/agitha`
+>    - **Developer URL:** `https://github.com/apokusin/agitha`
 >    - **Redirect callback URLs:** `<AGITHA_BASE_URL>/callback`
 >    - **Webhook URL:** `<AGITHA_BASE_URL>/linear-webhook`
 >    - **Webhook:** ✓ enabled
