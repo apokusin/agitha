@@ -452,6 +452,12 @@
 										"type": "string"
 									}
 								},
+								"writeScopes": {
+									"type": "array",
+									"items": {
+										"type": "string"
+									}
+								},
 								"model": {
 									"type": "string"
 								},
@@ -976,6 +982,12 @@
 						]
 					},
 					"disallowedTools": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					"writeScopes": {
 						"type": "array",
 						"items": {
 							"type": "string"

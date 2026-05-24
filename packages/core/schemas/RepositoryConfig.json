@@ -447,6 +447,12 @@
 							"type": "string"
 						}
 					},
+					"writeScopes": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
 					"model": {
 						"type": "string"
 					},

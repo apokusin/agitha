@@ -143,4 +143,80 @@ describe("ToolPermissionResolver custom personalities", () => {
 
 		expect(tools).toEqual(["Read"]);
 	});
+
+	it("writeScopes expands a bare Write entry into per-scope variants", () => {
+		const config = makeConfig();
+		const resolver = new ToolPermissionResolver(config, silentLogger);
+		const repo = makeRepo();
+		const personality: CustomPersonalityConfig = {
+			labels: ["Article"],
+			promptPath: "/tmp/copy-writer.md",
+			allowedTools: ["Read", "Write"],
+			writeScopes: ["./content/**", "./drafts/**"],
+		};
+
+		const tools = resolver.buildAllowedTools(repo, undefined, personality);
+
+		expect(tools).toEqual([
+			"Read",
+			"Write(./content/**)",
+			"Write(./drafts/**)",
+		]);
+		expect(tools).not.toContain("Write");
+	});
+
+	it("writeScopes expands both Write and Edit entries per scope", () => {
+		const config = makeConfig();
+		const resolver = new ToolPermissionResolver(config, silentLogger);
+		const repo = makeRepo();
+		const personality: CustomPersonalityConfig = {
+			labels: ["Article"],
+			promptPath: "/tmp/copy-writer.md",
+			allowedTools: ["Read", "Write", "Edit", "Grep"],
+			writeScopes: ["./content/**", "./drafts/**"],
+		};
+
+		const tools = resolver.buildAllowedTools(repo, undefined, personality);
+
+		expect(tools).toEqual([
+			"Read",
+			"Write(./content/**)",
+			"Write(./drafts/**)",
+			"Edit(./content/**)",
+			"Edit(./drafts/**)",
+			"Grep",
+		]);
+	});
+
+	it("writeScopes leaves already-scoped Write entries alone and appends nothing extra", () => {
+		const config = makeConfig();
+		const resolver = new ToolPermissionResolver(config, silentLogger);
+		const repo = makeRepo();
+		const personality: CustomPersonalityConfig = {
+			labels: ["Article"],
+			promptPath: "/tmp/copy-writer.md",
+			allowedTools: ["Write(./other/**)"],
+			writeScopes: ["./content/**"],
+		};
+
+		const tools = resolver.buildAllowedTools(repo, undefined, personality);
+
+		expect(tools).toEqual(["Write(./other/**)"]);
+	});
+
+	it("writeScopes has no effect when allowedTools has neither Write nor Edit", () => {
+		const config = makeConfig();
+		const resolver = new ToolPermissionResolver(config, silentLogger);
+		const repo = makeRepo();
+		const personality: CustomPersonalityConfig = {
+			labels: ["Reader"],
+			promptPath: "/tmp/reader.md",
+			allowedTools: ["Read", "Glob", "Grep"],
+			writeScopes: ["./content/**"],
+		};
+
+		const tools = resolver.buildAllowedTools(repo, undefined, personality);
+
+		expect(tools).toEqual(["Read", "Glob", "Grep"]);
+	});
 });

@@ -156,6 +156,7 @@ Can be configured at the workspace level (top-level `customPersonalities` in `co
 - **`promptPath`** (string, required) — Path to the system-prompt markdown file. Supports `~/` expansion (resolved against the user's home directory) and is resolved at config load time.
 - **`allowedTools`** (string or array, optional) — Tool list or preset (`"readOnly"`, `"safe"`, `"all"`, `"coordinator"`). When set, fully replaces the resolved tool list — the personality owns its tool surface.
 - **`disallowedTools`** (array of strings, optional) — Tools to explicitly deny. When set, fully replaces any per-repository / global disallow list.
+- **`writeScopes`** (array of strings, optional) — Workspace-relative glob patterns (e.g. `["./content/**"]`) that scope any unscoped `"Write"` or `"Edit"` entry in `allowedTools`. Already-parenthesized entries (e.g. `"Write(./other/**)"`) pass through unchanged. Has no effect when `allowedTools` is unset.
 - **`model`** (string, optional) — Model override for the runner (e.g., `"claude-opus-4-7"`). Takes precedence over per-issue description tags, per-repo `model`, and runner defaults.
 - **`description`** (string, optional) — Human-readable description shown in logs.
 
@@ -206,6 +207,21 @@ Can be configured at the workspace level (top-level `customPersonalities` in `co
 - When a custom personality matches, the built-in `labelPrompts` resolution is skipped and the personality's `allowedTools` / `disallowedTools` / `model` (when set) replace the corresponding chain entries.
 - When the personality omits `allowedTools` / `disallowedTools`, normal resolution applies (repository overrides, then global defaults).
 - If the prompt file cannot be read at session start, the personality is skipped and the built-in matcher runs as a fallback.
+
+### Scoping write access
+
+By default, granting a personality `"Write"` (or `"Edit"`) in `allowedTools` lets the agent write anywhere in the worktree. For personalities that should only touch a specific subtree — e.g. a copy-writer that only edits articles under `./content/` — declare `writeScopes` to constrain where writes can land:
+
+```json
+"copy-writer": {
+  "labels": ["Article"],
+  "promptPath": "~/.cyrus/personalities/copy-writer.md",
+  "allowedTools": ["Read", "Glob", "Grep", "WebFetch", "Write"],
+  "writeScopes": ["./content/**"]
+}
+```
+
+At session start the bare `"Write"` is expanded into `"Write(./content/**)"`, so the final allow-list passed to the runner is `["Read", "Glob", "Grep", "WebFetch", "Write(./content/**)"]`. List multiple patterns to allow writes in several directories (e.g. `["./content/**", "./drafts/**"]` produces one `Write(<scope>)` entry per scope). Entries that are already parenthesized — for example `"Write(./other/**)"` — pass through verbatim and are not duplicated per scope.
 
 ---
 

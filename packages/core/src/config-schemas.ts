@@ -129,6 +129,9 @@ const PromptTypeDefaultsSchema = z.object({
  *   `allowedTools` is set, it fully replaces the resolved tool list for
  *   sessions handled by this personality (presets like `readOnly`,
  *   `safe`, `all`, `coordinator` are supported).
+ * - `writeScopes`: optional workspace-relative glob patterns that scope
+ *   any unscoped `Write` or `Edit` entry in `allowedTools` to specific
+ *   directories.
  * - `model`: optional model override for the runner (forwarded to the
  *   selected runner's model field).
  * - `description`: optional human-readable description shown in logs and
@@ -139,6 +142,15 @@ const CustomPersonalityConfigSchema = z.object({
 	promptPath: z.string(),
 	allowedTools: ToolRestrictionSchema.optional(),
 	disallowedTools: z.array(z.string()).optional(),
+	/**
+	 * Workspace-relative glob patterns (e.g. `["./content/**", "./drafts/**"]`)
+	 * that scope any unscoped `Write` or `Edit` entry in `allowedTools`. When
+	 * set, a bare `"Write"` in `allowedTools` is replaced with one
+	 * `"Write(<scope>)"` entry per scope (same for `"Edit"`). Already-
+	 * parenthesized entries (e.g. `"Write(./other/**)"`) are passed through
+	 * unchanged. Has no effect when `allowedTools` is unset.
+	 */
+	writeScopes: z.array(z.string()).optional(),
 	model: z.string().optional(),
 	description: z.string().optional(),
 });

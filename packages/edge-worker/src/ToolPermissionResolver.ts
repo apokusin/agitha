@@ -79,6 +79,35 @@ export class ToolPermissionResolver {
 	}
 
 	/**
+	 * Expand bare `Write` / `Edit` entries into per-scope variants.
+	 *
+	 * For each entry in `tools` exactly equal to `"Write"` or `"Edit"`, drop
+	 * it and append one `"<tool>(<scope>)"` entry per scope. Entries that are
+	 * already parenthesized (e.g. `"Write(./other/**)"`) — anything
+	 * containing `(` — pass through verbatim. Insertion order is preserved
+	 * for everything else.
+	 *
+	 * When `writeScopes` is undefined or empty the input is returned as-is.
+	 */
+	private applyWriteScopes(tools: string[], writeScopes?: string[]): string[] {
+		if (!writeScopes || writeScopes.length === 0) {
+			return tools;
+		}
+
+		const expanded: string[] = [];
+		for (const tool of tools) {
+			if (tool === "Write" || tool === "Edit") {
+				for (const scope of writeScopes) {
+					expanded.push(`${tool}(${scope})`);
+				}
+			} else {
+				expanded.push(tool);
+			}
+		}
+		return expanded;
+	}
+
+	/**
 	 * Build allowed tools for Slack chat sessions.
 	 *
 	 * Returns the team-configured `slackAllowedTools` if set, otherwise the
@@ -134,7 +163,8 @@ export class ToolPermissionResolver {
 		customPersonality?: CustomPersonalityConfig,
 	): string[] {
 		if (customPersonality?.allowedTools !== undefined) {
-			return this.resolveToolPreset(customPersonality.allowedTools);
+			const resolved = this.resolveToolPreset(customPersonality.allowedTools);
+			return this.applyWriteScopes(resolved, customPersonality.writeScopes);
 		}
 
 		const repoArray = Array.isArray(repositories)
