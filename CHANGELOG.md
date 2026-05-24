@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Custom personalities.** Define your own agent roles (e.g. `code-reviewer`, `security-auditor`) that pair Linear labels with a system-prompt markdown file plus optional tool / model overrides. Configure at the workspace level (top-level `customPersonalities`) or per-repository (inside a repository entry). Custom personalities match before the built-in label modes (debugger/builder/scoper/orchestrator) and take precedence when their labels match. See `docs/CONFIG_FILE.md#custom-personalities`.
+- **Personality write-scoping.** Optional `writeScopes` field on a custom personality scopes any bare `Write` / `Edit` in `allowedTools` to one or more workspace-relative glob patterns (e.g. `["./content/**"]` for a copy-writer personality). Already-parenthesized entries pass through unchanged.
+- **Custom personality timeline visibility.** The "Entering '<mode>' mode because of the '<label>' label" thought posted to the Linear activity timeline at session start now also fires for custom personalities (using the personality's `key` and `description` when set).
+- **Custom personality conflict warnings.** When two custom personalities (across per-repo entries and the workspace map) would match the same issue labels, a `warn` log lists the losing personality so operators can clean up ambiguous config. Same-key per-repo-over-workspace precedence overrides remain silent.
 
 ### Changed
 - License metadata corrected from MIT to Apache-2.0 in `package.json` files (the project's `LICENSE` file has always been Apache 2.0; this aligns the SPDX field for license scanners and downstream consumers).
