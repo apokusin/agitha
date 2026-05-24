@@ -6,13 +6,13 @@
  */
 
 import type {
+	AgithaAgentSession,
 	BaseBranchResolution,
-	CyrusAgentSession,
 	GuidanceRule,
 	Issue,
 	RepositoryConfig,
 	WebhookAgentSession,
-} from "cyrus-core";
+} from "agitha-core";
 
 /**
  * Output structure from buildPrompt - contains everything needed to start a Claude session
@@ -64,8 +64,8 @@ export type PromptType =
  */
 export interface PromptAssemblyInput {
 	// ===== Session Context =====
-	/** The Cyrus agent session */
-	session: CyrusAgentSession;
+	/** The Agitha agent session */
+	session: AgithaAgentSession;
 
 	/** Full issue details */
 	fullIssue: Issue;

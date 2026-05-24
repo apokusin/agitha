@@ -3,8 +3,8 @@ import {
 	LinearWebhookClient,
 	type LinearWebhookPayload,
 } from "@linear/sdk/webhooks";
-import type { IAgentEventTransport, TranslationContext } from "cyrus-core";
-import { createLogger, type ILogger, ipMatchesAllowlist } from "cyrus-core";
+import type { IAgentEventTransport, TranslationContext } from "agitha-core";
+import { createLogger, type ILogger, ipMatchesAllowlist } from "agitha-core";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { LinearMessageTranslator } from "./LinearMessageTranslator.js";
 import type {

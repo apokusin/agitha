@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { CloudflareTunnelClient } from "cyrus-cloudflare-tunnel-client";
-import { createLogger, type ILogger } from "cyrus-core";
+import { CloudflareTunnelClient } from "agitha-cloudflare-tunnel-client";
+import { createLogger, type ILogger } from "agitha-core";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 
 /**
@@ -183,7 +183,7 @@ export class SharedApplicationServer {
 				if (connectionCount < requiredConnections) {
 					reject(
 						new Error(
-							`Timeout waiting for Cloudflare tunnel (${connectionCount}/${requiredConnections} connections). This is usually caused by firewall/VPN/proxy blocking cloudflared. See troubleshooting: https://github.com/ceedaragents/cyrus/blob/main/docs/CLOUDFLARE_TUNNEL.md#troubleshooting`,
+							`Timeout waiting for Cloudflare tunnel (${connectionCount}/${requiredConnections} connections). This is usually caused by firewall/VPN/proxy blocking cloudflared. See troubleshooting: https://github.com/ceedaragents/agitha/blob/main/docs/CLOUDFLARE_TUNNEL.md#troubleshooting`,
 						),
 					);
 				}
@@ -300,7 +300,7 @@ export class SharedApplicationServer {
 
 			// Check if we should use direct Linear OAuth (when self-hosting)
 			const isExternalHost =
-				process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+				process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 			const useDirectOAuth = isExternalHost && process.env.LINEAR_CLIENT_ID;
 
 			const callbackBaseUrl = `http://${this.host}:${this.port}`;
@@ -309,7 +309,7 @@ export class SharedApplicationServer {
 			if (useDirectOAuth) {
 				// Use local OAuth authorize endpoint
 				authUrl = `${callbackBaseUrl}/oauth/authorize?callback=${encodeURIComponent(`${callbackBaseUrl}/callback`)}`;
-				this.logger.info(`Using direct OAuth mode (CYRUS_HOST_EXTERNAL=true)`);
+				this.logger.info(`Using direct OAuth mode (AGITHA_HOST_EXTERNAL=true)`);
 			} else {
 				// Use proxy OAuth endpoint
 				authUrl = `${proxyUrl}/oauth/authorize?callback=${encodeURIComponent(`${callbackBaseUrl}/callback`)}`;

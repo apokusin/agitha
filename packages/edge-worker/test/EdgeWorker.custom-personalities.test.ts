@@ -1,15 +1,15 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { CustomPersonalityConfig } from "cyrus-core";
+import type { CustomPersonalityConfig } from "agitha-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TEST_CYRUS_HOME } from "./test-dirs.js";
+import { TEST_AGITHA_HOME } from "./test-dirs.js";
 
 // Mock dependencies BEFORE imports.
 // Intentionally do NOT mock `fs/promises` — PromptBuilder loads personality
 // markdown via `readFile`, and these tests rely on real files written into
 // tmpdir() so the EdgeWorker → PromptBuilder pipeline runs end-to-end.
-vi.mock("cyrus-claude-runner", () => ({
+vi.mock("agitha-claude-runner", () => ({
 	ClaudeRunner: vi.fn(),
 	getSafeTools: vi.fn(() => [
 		"Read",
@@ -41,12 +41,12 @@ vi.mock("cyrus-claude-runner", () => ({
 	]),
 }));
 vi.mock("@linear/sdk");
-vi.mock("cyrus-linear-event-transport");
+vi.mock("agitha-linear-event-transport");
 vi.mock("../src/SharedApplicationServer.js");
 vi.mock("../src/AgentSessionManager.js");
 
 import { LinearClient } from "@linear/sdk";
-import { LinearEventTransport } from "cyrus-linear-event-transport";
+import { LinearEventTransport } from "agitha-linear-event-transport";
 import { AgentSessionManager } from "../src/AgentSessionManager.js";
 import { EdgeWorker } from "../src/EdgeWorker.js";
 import { SharedApplicationServer } from "../src/SharedApplicationServer.js";
@@ -74,7 +74,7 @@ describe("EdgeWorker - Custom Personalities Wiring", () => {
 		// readFile() succeeds and produces a real customPersonality match.
 		tmpDir = join(
 			tmpdir(),
-			`cyrus-edgeworker-personality-test-${Date.now()}-${Math.random()
+			`agitha-edgeworker-personality-test-${Date.now()}-${Math.random()
 				.toString(36)
 				.slice(2)}`,
 		);
@@ -179,7 +179,7 @@ describe("EdgeWorker - Custom Personalities Wiring", () => {
 	): EdgeWorkerConfig {
 		return {
 			proxyUrl: "http://localhost:3000",
-			cyrusHome: TEST_CYRUS_HOME,
+			agithaHome: TEST_AGITHA_HOME,
 			repositories: [makeBaseRepo()],
 			linearWorkspaces: {
 				"test-workspace": { linearToken: "test-token" },

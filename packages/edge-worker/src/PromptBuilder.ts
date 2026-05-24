@@ -15,7 +15,7 @@ import {
 	requireLinearWorkspaceId,
 	type WebhookAgentSession,
 	type WebhookComment,
-} from "cyrus-core";
+} from "agitha-core";
 import type { GitService } from "./GitService.js";
 
 /**
@@ -1650,7 +1650,7 @@ ${reply.body}
 				{
 					headers: {
 						Accept: "application/vnd.github.v3+json",
-						"User-Agent": "Cyrus-Agent",
+						"User-Agent": "Agitha-Agent",
 					},
 				},
 			);

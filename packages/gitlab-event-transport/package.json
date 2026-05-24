@@ -1,5 +1,5 @@
 {
-	"name": "cyrus-gitlab-event-transport",
+	"name": "agitha-gitlab-event-transport",
 	"version": "0.2.57",
 	"description": "GitLab event transport for receiving and verifying forwarded GitLab webhooks",
 	"type": "module",
@@ -16,7 +16,7 @@
 		"test:run": "vitest run --passWithNoTests"
 	},
 	"dependencies": {
-		"cyrus-core": "workspace:*",
+		"agitha-core": "workspace:*",
 		"fastify": "^5.8.5"
 	},
 	"devDependencies": {

@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { getReadOnlyTools } from "cyrus-claude-runner";
-import type { RepositoryConfig } from "cyrus-core";
+import { getReadOnlyTools } from "agitha-claude-runner";
+import type { RepositoryConfig } from "agitha-core";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatRepositoryProvider } from "../src/ChatRepositoryProvider.js";
 import { LiveChatRepositoryProvider } from "../src/ChatRepositoryProvider.js";
@@ -8,7 +8,7 @@ import type { ChatPlatformAdapter } from "../src/ChatSessionHandler.js";
 import { ChatSessionHandler } from "../src/ChatSessionHandler.js";
 import type { RunnerConfigBuilder } from "../src/RunnerConfigBuilder.js";
 import { SlackChatAdapter } from "../src/SlackChatAdapter.js";
-import { TEST_CYRUS_CHAT } from "./test-dirs.js";
+import { TEST_AGITHA_CHAT } from "./test-dirs.js";
 
 function createMockRunnerConfigBuilder(): RunnerConfigBuilder {
 	return {
@@ -24,7 +24,7 @@ function createMockRunnerConfigBuilder(): RunnerConfigBuilder {
 				disallowedTools: [],
 				allowedDirectories: [input.workspacePath, ...repositoryPaths],
 				workspaceName: input.workspaceName,
-				cyrusHome: input.cyrusHome,
+				agithaHome: input.agithaHome,
 				appendSystemPrompt: input.systemPrompt,
 				...(input.resumeSessionId
 					? { resumeSessionId: input.resumeSessionId }
@@ -101,7 +101,7 @@ describe("ChatSessionHandler chat session permissions", () => {
 			eventId: "test-event",
 			threadKey: "test-thread",
 		};
-		const cyrusHome = TEST_CYRUS_CHAT;
+		const agithaHome = TEST_AGITHA_CHAT;
 		const chatRepositoryPaths = ["/repo/chat-one", "/repo/chat-two"];
 		let capturedConfig: any;
 
@@ -124,7 +124,7 @@ describe("ChatSessionHandler chat session permissions", () => {
 		const onClaudeError = vi.fn();
 
 		const handler = new ChatSessionHandler(adapter, {
-			cyrusHome,
+			agithaHome,
 			chatRepositoryProvider: createStaticProvider(chatRepositoryPaths),
 			runnerConfigBuilder: createMockRunnerConfigBuilder(),
 			createRunner: createRunner,
@@ -142,7 +142,11 @@ describe("ChatSessionHandler chat session permissions", () => {
 		expect(capturedConfig.allowedTools).toContain("Bash(git -C * pull)");
 		expect(capturedConfig.allowedTools).not.toContain("Edit(**)");
 
-		const expectedWorkspace = join(cyrusHome, "slack-workspaces", "thread-key");
+		const expectedWorkspace = join(
+			agithaHome,
+			"slack-workspaces",
+			"thread-key",
+		);
 		expect(capturedConfig.allowedDirectories).toContain(expectedWorkspace);
 		for (const path of chatRepositoryPaths) {
 			expect(capturedConfig.allowedDirectories).toContain(path);
@@ -158,7 +162,7 @@ describe("SlackChatAdapter system prompt", () => {
 			payload: {
 				user: "U1",
 				channel: "C1",
-				text: "<@cyrus> inspect code",
+				text: "<@agitha> inspect code",
 				ts: "1700000000.000100",
 				event_ts: "1700000000.000100",
 				type: "app_mention",
@@ -184,7 +188,7 @@ describe("SlackChatAdapter system prompt", () => {
 			payload: {
 				user: "U1",
 				channel: "C1",
-				text: "<@cyrus> assign this work",
+				text: "<@agitha> assign this work",
 				ts: "1700000000.000100",
 				event_ts: "1700000000.000100",
 				type: "app_mention",
@@ -203,7 +207,7 @@ describe("ChatRepositoryProvider runtime updates", () => {
 		payload: {
 			user: "U1",
 			channel: "C1",
-			text: "<@cyrus> test",
+			text: "<@agitha> test",
 			ts: "1700000000.000100",
 			event_ts: "1700000000.000100",
 			type: "app_mention",
@@ -255,7 +259,7 @@ describe("ChatRepositoryProvider runtime updates", () => {
 	});
 
 	it("ChatSessionHandler reads live repository paths from provider at session build time", async () => {
-		const cyrusHome = TEST_CYRUS_CHAT;
+		const agithaHome = TEST_AGITHA_CHAT;
 		const paths = ["/repo/A"];
 		const provider: ChatRepositoryProvider = {
 			getRepositoryPaths: () => [...paths],
@@ -279,7 +283,7 @@ describe("ChatRepositoryProvider runtime updates", () => {
 
 		const adapter = new TestChatAdapter("runtime-thread");
 		const handler = new ChatSessionHandler(adapter, {
-			cyrusHome,
+			agithaHome,
 			chatRepositoryProvider: provider,
 			runnerConfigBuilder: createMockRunnerConfigBuilder(),
 			createRunner,
@@ -302,7 +306,7 @@ describe("ChatRepositoryProvider runtime updates", () => {
 	});
 
 	it("ChatSessionHandler excludes removed repos from allowedDirectories", async () => {
-		const cyrusHome = TEST_CYRUS_CHAT;
+		const agithaHome = TEST_AGITHA_CHAT;
 		const paths = ["/repo/A", "/repo/B"];
 		const provider: ChatRepositoryProvider = {
 			getRepositoryPaths: () => [...paths],
@@ -326,7 +330,7 @@ describe("ChatRepositoryProvider runtime updates", () => {
 
 		const adapter = new TestChatAdapter("remove-thread");
 		const handler = new ChatSessionHandler(adapter, {
-			cyrusHome,
+			agithaHome,
 			chatRepositoryProvider: provider,
 			runnerConfigBuilder: createMockRunnerConfigBuilder(),
 			createRunner,

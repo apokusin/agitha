@@ -1,8 +1,8 @@
-import { getCyrusAppUrl } from "cyrus-cloudflare-tunnel-client";
-import type { EdgeWorkerConfig, Issue, RepositoryConfig } from "cyrus-core";
-import type { GitService, SharedApplicationServer } from "cyrus-edge-worker";
-import { EdgeWorker } from "cyrus-edge-worker";
-import { SlackEventTransport } from "cyrus-slack-event-transport";
+import { getAgithaAppUrl } from "agitha-cloudflare-tunnel-client";
+import type { EdgeWorkerConfig, Issue, RepositoryConfig } from "agitha-core";
+import type { GitService, SharedApplicationServer } from "agitha-edge-worker";
+import { EdgeWorker } from "agitha-edge-worker";
+import { SlackEventTransport } from "agitha-slack-event-transport";
 import { DEFAULT_SERVER_PORT, parsePort } from "../config/constants.js";
 import type { Workspace } from "../config/types.js";
 import type { ConfigService } from "./ConfigService.js";
@@ -19,7 +19,7 @@ export class WorkerService {
 	constructor(
 		private configService: ConfigService,
 		private gitService: GitService,
-		private cyrusHome: string,
+		private agithaHome: string,
 		private logger: Logger,
 		private version?: string,
 	) {}
@@ -46,7 +46,7 @@ export class WorkerService {
 		await this.startPreWorkerServer({
 			headerLine: "⏳ Waiting for configuration from server...",
 			footerLines: (appUrl) => [
-				"Your Cyrus instance is ready to receive configuration.",
+				"Your Agitha instance is ready to receive configuration.",
 				`Complete setup at: ${appUrl}/onboarding`,
 			],
 		});
@@ -61,7 +61,7 @@ export class WorkerService {
 			headerLine: "⏸️  No repositories configured",
 			footerLines: (appUrl) =>
 				process.env.LINEAR_CLIENT_ID
-					? ["Add a repository with: cyrus self-add-repo <git-url>"]
+					? ["Add a repository with: agitha self-add-repo <git-url>"]
 					: [
 							`Waiting for repository configuration from ${appUrl}`,
 							`Add repositories at: ${appUrl}/repos`,
@@ -78,13 +78,13 @@ export class WorkerService {
 		headerLine: string;
 		footerLines: (appUrl: string) => string[];
 	}): Promise<void> {
-		const { SharedApplicationServer } = await import("cyrus-edge-worker");
-		const { ConfigUpdater } = await import("cyrus-config-updater");
+		const { SharedApplicationServer } = await import("agitha-edge-worker");
+		const { ConfigUpdater } = await import("agitha-config-updater");
 
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 		const serverPort = parsePort(
-			process.env.CYRUS_SERVER_PORT,
+			process.env.AGITHA_SERVER_PORT,
 			DEFAULT_SERVER_PORT,
 		);
 		const serverHost = isExternalHost ? "0.0.0.0" : "localhost";
@@ -97,14 +97,14 @@ export class WorkerService {
 
 		const configUpdater = new ConfigUpdater(
 			this.setupWaitingServer.getFastifyInstance(),
-			this.cyrusHome,
-			() => process.env.CYRUS_API_KEY || "",
+			this.agithaHome,
+			() => process.env.AGITHA_API_KEY || "",
 		);
 		configUpdater.register();
 
 		this.logger.info("✅ Config updater registered");
 		this.logger.info(
-			"   Routes: /api/update/cyrus-config, /api/update/cyrus-env,",
+			"   Routes: /api/update/agitha-config, /api/update/agitha-env,",
 		);
 		this.logger.info(
 			"           /api/update/repository, /api/update/test-mcp, /api/update/configure-mcp",
@@ -126,7 +126,7 @@ export class WorkerService {
 
 		this.logger.info("📡 Config updater: Ready");
 		this.logger.raw("");
-		for (const line of banner.footerLines(getCyrusAppUrl())) {
+		for (const line of banner.footerLines(getAgithaAppUrl())) {
 			this.logger.info(line);
 		}
 		this.logger.divider(70);
@@ -135,11 +135,11 @@ export class WorkerService {
 	/**
 	 * Register webhook endpoints that don't require repositories.
 	 * Called from both idle and setup-waiting modes so that external services
-	 * (e.g. Slack URL verification) can reach Cyrus during onboarding.
+	 * (e.g. Slack URL verification) can reach Agitha during onboarding.
 	 */
 	private registerWebhookTransports(server: SharedApplicationServer): void {
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 		const slackSigningSecret = process.env.SLACK_SIGNING_SECRET;
 		const hasSlackSigningSecret =
 			slackSigningSecret != null && slackSigningSecret !== "";
@@ -184,7 +184,7 @@ export class WorkerService {
 
 		// Determine if using external host
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 
 		// Load config once for model defaults
 		const edgeConfig = this.configService.load();
@@ -193,7 +193,7 @@ export class WorkerService {
 		const config: EdgeWorkerConfig = {
 			version: this.version,
 			repositories,
-			cyrusHome: this.cyrusHome,
+			agithaHome: this.agithaHome,
 			linearAllowedTools:
 				process.env.LINEAR_ALLOWED_TOOLS?.split(",").map((t) => t.trim()) ||
 				edgeConfig.linearAllowedTools ||
@@ -210,21 +210,22 @@ export class WorkerService {
 			// Model configuration: environment variables take precedence over config file.
 			// Legacy env vars/keys are still accepted for backwards compatibility.
 			claudeDefaultModel:
-				process.env.CYRUS_CLAUDE_DEFAULT_MODEL ||
-				process.env.CYRUS_DEFAULT_MODEL ||
+				process.env.AGITHA_CLAUDE_DEFAULT_MODEL ||
+				process.env.AGITHA_DEFAULT_MODEL ||
 				edgeConfig.claudeDefaultModel ||
 				edgeConfig.defaultModel,
 			claudeDefaultFallbackModel:
-				process.env.CYRUS_CLAUDE_DEFAULT_FALLBACK_MODEL ||
-				process.env.CYRUS_DEFAULT_FALLBACK_MODEL ||
+				process.env.AGITHA_CLAUDE_DEFAULT_FALLBACK_MODEL ||
+				process.env.AGITHA_DEFAULT_FALLBACK_MODEL ||
 				edgeConfig.claudeDefaultFallbackModel ||
 				edgeConfig.defaultFallbackModel,
 			geminiDefaultModel:
-				process.env.CYRUS_GEMINI_DEFAULT_MODEL || edgeConfig.geminiDefaultModel,
+				process.env.AGITHA_GEMINI_DEFAULT_MODEL ||
+				edgeConfig.geminiDefaultModel,
 			codexDefaultModel:
-				process.env.CYRUS_CODEX_DEFAULT_MODEL || edgeConfig.codexDefaultModel,
+				process.env.AGITHA_CODEX_DEFAULT_MODEL || edgeConfig.codexDefaultModel,
 			defaultRunner:
-				(process.env.CYRUS_DEFAULT_RUNNER as
+				(process.env.AGITHA_DEFAULT_RUNNER as
 					| "claude"
 					| "gemini"
 					| "codex"
@@ -233,8 +234,11 @@ export class WorkerService {
 			issueUpdateTrigger: edgeConfig.issueUpdateTrigger,
 			promptDefaults: edgeConfig.promptDefaults,
 			linearWorkspaces: edgeConfig.linearWorkspaces,
-			webhookBaseUrl: process.env.CYRUS_BASE_URL,
-			serverPort: parsePort(process.env.CYRUS_SERVER_PORT, DEFAULT_SERVER_PORT),
+			webhookBaseUrl: process.env.AGITHA_BASE_URL,
+			serverPort: parsePort(
+				process.env.AGITHA_SERVER_PORT,
+				DEFAULT_SERVER_PORT,
+			),
 			serverHost: isExternalHost ? "0.0.0.0" : "localhost",
 			ngrokAuthToken,
 			// User access control configuration

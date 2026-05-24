@@ -1,24 +1,24 @@
 import { LinearClient } from "@linear/sdk";
-import { ClaudeRunner } from "cyrus-claude-runner";
-import { LinearEventTransport } from "cyrus-linear-event-transport";
-import { createCyrusToolsServer } from "cyrus-mcp-tools";
+import { ClaudeRunner } from "agitha-claude-runner";
+import { LinearEventTransport } from "agitha-linear-event-transport";
+import { createAgithaToolsServer } from "agitha-mcp-tools";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSessionManager } from "../src/AgentSessionManager.js";
 import { EdgeWorker } from "../src/EdgeWorker.js";
 import { SharedApplicationServer } from "../src/SharedApplicationServer.js";
 import type { EdgeWorkerConfig, RepositoryConfig } from "../src/types.js";
-import { TEST_CYRUS_HOME } from "./test-dirs.js";
+import { TEST_AGITHA_HOME } from "./test-dirs.js";
 
 // Mock all dependencies
 vi.mock("fs/promises");
-vi.mock("cyrus-claude-runner");
-vi.mock("cyrus-mcp-tools");
-vi.mock("cyrus-codex-runner");
-vi.mock("cyrus-linear-event-transport");
+vi.mock("agitha-claude-runner");
+vi.mock("agitha-mcp-tools");
+vi.mock("agitha-codex-runner");
+vi.mock("agitha-linear-event-transport");
 vi.mock("@linear/sdk");
 vi.mock("../src/SharedApplicationServer.js");
 vi.mock("../src/AgentSessionManager.js");
-vi.mock("cyrus-core", async (importOriginal) => {
+vi.mock("agitha-core", async (importOriginal) => {
 	const actual = (await importOriginal()) as any;
 	return {
 		...actual,
@@ -60,21 +60,23 @@ describe("EdgeWorker - Feedback Delivery Timeout Issue", () => {
 		mockOnFeedbackDelivery = vi.fn();
 		_mockOnSessionCreated = vi.fn();
 
-		// Mock createCyrusToolsServer to return a proper structure
-		vi.mocked(createCyrusToolsServer).mockImplementation((_client, options) => {
-			// Capture the callbacks
-			if (options?.onFeedbackDelivery) {
-				mockOnFeedbackDelivery = options.onFeedbackDelivery;
-			}
-			if (options?.onSessionCreated) {
-				_mockOnSessionCreated = options.onSessionCreated;
-			}
+		// Mock createAgithaToolsServer to return a proper structure
+		vi.mocked(createAgithaToolsServer).mockImplementation(
+			(_client, options) => {
+				// Capture the callbacks
+				if (options?.onFeedbackDelivery) {
+					mockOnFeedbackDelivery = options.onFeedbackDelivery;
+				}
+				if (options?.onSessionCreated) {
+					_mockOnSessionCreated = options.onSessionCreated;
+				}
 
-			// Return a mock MCP server shape
-			return {
-				server: {},
-			} as any;
-		});
+				// Return a mock MCP server shape
+				return {
+					server: {},
+				} as any;
+			},
+		);
 
 		// Mock ClaudeRunner with a long-running session to simulate the timeout
 		mockClaudeRunner = {
@@ -157,7 +159,7 @@ describe("EdgeWorker - Feedback Delivery Timeout Issue", () => {
 
 		mockConfig = {
 			proxyUrl: "http://localhost:3000",
-			cyrusHome: TEST_CYRUS_HOME,
+			agithaHome: TEST_AGITHA_HOME,
 			repositories: [mockRepository],
 			linearWorkspaces: {
 				"test-workspace": { linearToken: "test-token" },
@@ -219,7 +221,7 @@ describe("EdgeWorker - Feedback Delivery Timeout Issue", () => {
 					return undefined;
 				});
 
-			// Build MCP config which will trigger createCyrusToolsServer
+			// Build MCP config which will trigger createAgithaToolsServer
 			const _mcpConfig = (edgeWorker as any).mcpConfigService.buildMcpConfig(
 				mockRepository.id,
 				mockRepository.linearWorkspaceId,

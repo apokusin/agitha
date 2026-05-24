@@ -3,26 +3,26 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type {
-	CyrusAgentSession,
-	CyrusAgentSessionEntry,
+	AgithaAgentSession,
+	AgithaAgentSessionEntry,
 	IssueContext,
 	IssueMinimal,
-} from "./CyrusAgentSession.js";
+} from "./AgithaAgentSession.js";
 import { createLogger, type ILogger } from "./logging/index.js";
 
 /** Current persistence format version */
 export const PERSISTENCE_VERSION = "4.0";
 
 // Serialized versions with Date fields as strings
-export type SerializedCyrusAgentSession = CyrusAgentSession;
-// extends Omit<CyrusAgentSession, 'createdAt' | 'updatedAt'> {
+export type SerializedAgithaAgentSession = AgithaAgentSession;
+// extends Omit<AgithaAgentSession, 'createdAt' | 'updatedAt'> {
 //   createdAt: string
 //   updatedAt: string
 // }
 
-export type SerializedCyrusAgentSessionEntry = CyrusAgentSessionEntry;
-// extends Omit<CyrusAgentSessionEntry, 'metadata'> {
-//   metadata?: Omit<CyrusAgentSessionEntry['metadata'], 'timestamp'> & {
+export type SerializedAgithaAgentSessionEntry = AgithaAgentSessionEntry;
+// extends Omit<AgithaAgentSessionEntry, 'metadata'> {
+//   metadata?: Omit<AgithaAgentSessionEntry['metadata'], 'timestamp'> & {
 //     timestamp?: string
 //   }
 // }
@@ -30,7 +30,7 @@ export type SerializedCyrusAgentSessionEntry = CyrusAgentSessionEntry;
 /**
  * v2.0 session format (for migration purposes)
  */
-interface V2CyrusAgentSession {
+interface V2AgithaAgentSession {
 	linearAgentActivitySessionId: string;
 	type: string;
 	status: string;
@@ -57,8 +57,8 @@ interface V2CyrusAgentSession {
  */
 export interface SerializableEdgeWorkerState {
 	// Agent Session state - flat map of sessionId → session (v4.0)
-	agentSessions?: Record<string, SerializedCyrusAgentSession>;
-	agentSessionEntries?: Record<string, SerializedCyrusAgentSessionEntry[]>;
+	agentSessions?: Record<string, SerializedAgithaAgentSession>;
+	agentSessionEntries?: Record<string, SerializedAgithaAgentSessionEntry[]>;
 	// Child to parent agent session mapping
 	childToParentAgentSession?: Record<string, string>;
 	// Issue to repository mapping (for caching user repository selections)
@@ -70,10 +70,10 @@ export interface SerializableEdgeWorkerState {
  * v3.0 nested state format (for migration purposes)
  */
 export interface V3SerializableEdgeWorkerState {
-	agentSessions?: Record<string, Record<string, SerializedCyrusAgentSession>>;
+	agentSessions?: Record<string, Record<string, SerializedAgithaAgentSession>>;
 	agentSessionEntries?: Record<
 		string,
-		Record<string, SerializedCyrusAgentSessionEntry[]>
+		Record<string, SerializedAgithaAgentSessionEntry[]>
 	>;
 	childToParentAgentSession?: Record<string, string>;
 	issueRepositoryCache?: Record<string, string>;
@@ -88,7 +88,7 @@ export class PersistenceManager {
 
 	constructor(persistencePath?: string, logger?: ILogger) {
 		this.persistencePath =
-			persistencePath || join(homedir(), ".cyrus", "state");
+			persistencePath || join(homedir(), ".agitha", "state");
 		this.logger = logger ?? createLogger({ component: "PersistenceManager" });
 	}
 
@@ -207,7 +207,7 @@ export class PersistenceManager {
 			)) {
 				migratedState.agentSessions![repoId] = {};
 				for (const [_sessionId, v2Session] of Object.entries(repoSessions)) {
-					const session = v2Session as unknown as V2CyrusAgentSession;
+					const session = v2Session as unknown as V2AgithaAgentSession;
 					const migratedSession = this.migrateSessionV2ToV3(session);
 					// Use the new id as the key
 					migratedState.agentSessions![repoId][migratedSession.id] =
@@ -233,8 +233,8 @@ export class PersistenceManager {
 	private migrateV3ToV4(
 		v3State: V3SerializableEdgeWorkerState,
 	): SerializableEdgeWorkerState {
-		const flatSessions: Record<string, SerializedCyrusAgentSession> = {};
-		const flatEntries: Record<string, SerializedCyrusAgentSessionEntry[]> = {};
+		const flatSessions: Record<string, SerializedAgithaAgentSession> = {};
+		const flatEntries: Record<string, SerializedAgithaAgentSessionEntry[]> = {};
 
 		// Flatten sessions: merge all repo-keyed sessions into a single flat map
 		// Preserve the repoId key as a RepositoryContext so migrated sessions
@@ -288,8 +288,8 @@ export class PersistenceManager {
 	 * Migrate a single session from v2.0 to v3.0 format
 	 */
 	private migrateSessionV2ToV3(
-		v2Session: V2CyrusAgentSession,
-	): SerializedCyrusAgentSession {
+		v2Session: V2AgithaAgentSession,
+	): SerializedAgithaAgentSession {
 		// Build issueContext from v2.0 fields
 		const issueContext: IssueContext = {
 			trackerId: "linear", // v2.0 only supported Linear
@@ -320,7 +320,7 @@ export class PersistenceManager {
 			issue: v2Session.issue,
 			// New field: empty repositories for migrated sessions
 			repositories: [],
-		} as SerializedCyrusAgentSession;
+		} as SerializedAgithaAgentSession;
 	}
 
 	/**

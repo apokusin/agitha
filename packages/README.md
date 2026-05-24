@@ -1,10 +1,10 @@
-# Cyrus Packages
+# Agitha Packages
 
-This directory contains the core packages that make up the Cyrus monorepo. Each package has a specific scope of concerns and well-defined responsibilities.
+This directory contains the core packages that make up the Agitha monorepo. Each package has a specific scope of concerns and well-defined responsibilities.
 
 ## Package Overview
 
-### @cyrus/core
+### @agitha/core
 **Scope**: Core domain models and business logic entities
 
 **Responsibilities**:
@@ -20,7 +20,7 @@ This directory contains the core packages that make up the Cyrus monorepo. Each 
 - `Workspace` - Working directory model
 - `Comment` - Issue comment model
 
-### @cyrus/claude-parser
+### @agitha/claude-parser
 **Scope**: Parse and interpret Claude's stdout/stderr output
 
 **Responsibilities**:
@@ -36,7 +36,7 @@ This directory contains the core packages that make up the Cyrus monorepo. Each 
 - `ClaudeEvent` - TypeScript types for all Claude events
 - Message type definitions
 
-### @cyrus/claude-runner
+### @agitha/claude-runner
 **Scope**: Manage Claude CLI process lifecycle
 
 **Responsibilities**:
@@ -52,7 +52,7 @@ This directory contains the core packages that make up the Cyrus monorepo. Each 
 - `getAllTools()` - List available Claude tools
 - Process configuration types
 
-### @cyrus/ndjson-client
+### @agitha/ndjson-client
 **Scope**: NDJSON streaming communication with edge proxy
 
 **Responsibilities**:
@@ -69,7 +69,7 @@ This directory contains the core packages that make up the Cyrus monorepo. Each 
 - `StatusUpdate` - Status update types
 - Configuration interfaces
 
-### @cyrus/edge-worker
+### @agitha/edge-worker
 **Scope**: Orchestrate Linear webhooks, Claude processing, and API responses
 
 **Responsibilities**:
@@ -89,23 +89,23 @@ This directory contains the core packages that make up the Cyrus monorepo. Each 
 ## Package Dependencies
 
 ```
-@cyrus/edge-worker
-  ├── @cyrus/core (Session, SessionManager)
-  ├── @cyrus/claude-parser (ClaudeEvent types)
-  ├── @cyrus/claude-runner (ClaudeRunner)
-  ├── @cyrus/ndjson-client (NdjsonClient)
+@agitha/edge-worker
+  ├── @agitha/core (Session, SessionManager)
+  ├── @agitha/claude-parser (ClaudeEvent types)
+  ├── @agitha/claude-runner (ClaudeRunner)
+  ├── @agitha/ndjson-client (NdjsonClient)
   └── @linear/sdk (Linear API)
 
-@cyrus/claude-runner
-  └── @cyrus/claude-parser (for event types)
+@agitha/claude-runner
+  └── @agitha/claude-parser (for event types)
 
-@cyrus/ndjson-client
+@agitha/ndjson-client
   └── (no internal dependencies)
 
-@cyrus/claude-parser
+@agitha/claude-parser
   └── (no internal dependencies)
 
-@cyrus/core
+@agitha/core
   └── (no internal dependencies)
 ```
 

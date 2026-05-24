@@ -4,8 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setGlobalErrorReporter } from "agitha-core";
 import { Command } from "commander";
-import { setGlobalErrorReporter } from "cyrus-core";
 import dotenv from "dotenv";
 import { Application } from "./Application.js";
 import { AuthCommand } from "./commands/AuthCommand.js";
@@ -26,9 +26,10 @@ const packageJsonPath = resolve(__dirname, "..", "..", "package.json");
 const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
 
 // Pre-load env vars from the resolved .env file before initialising Sentry, so
-// that CYRUS_SENTRY_DISABLED / CYRUS_SENTRY_DSN take effect on the first run.
+// that AGITHA_SENTRY_DISABLED / AGITHA_SENTRY_DSN take effect on the first run.
 // We re-resolve the path inside Application using the same precedence (CLI
-// flag wins); this preliminary load only honours CYRUS_HOME and the default.
+// flag wins); this preliminary load only honours AGITHA_HOME and the default.
+foldLegacyCyrusEnvVars();
 preloadEnvForBootstrap();
 
 // Initialise the error reporter as early as possible so that exceptions
@@ -42,13 +43,13 @@ setGlobalErrorReporter(errorReporter);
 const program = new Command();
 
 program
-	.name("cyrus")
+	.name("agitha")
 	.description("AI-powered Linear issue automation using Claude")
 	.version(packageJson.version)
 	.option(
-		"--cyrus-home <path>",
-		"Specify custom Cyrus config directory",
-		resolve(homedir(), ".cyrus"),
+		"--agitha-home <path>",
+		"Specify custom Agitha config directory (default: ~/.agitha; falls back to ~/.cyrus if migrating from Cyrus and only the legacy dir exists)",
+		resolveDefaultAgithaHome(),
 	)
 	.option("--env-file <path>", "Path to environment variables file");
 
@@ -59,7 +60,7 @@ program
 	.action(async () => {
 		const opts = program.opts();
 		const app = new Application(
-			opts.cyrusHome,
+			opts.agithaHome,
 			opts.envFile,
 			packageJson.version,
 			errorReporter,
@@ -70,11 +71,11 @@ program
 // Auth command
 program
 	.command("auth <auth-key>")
-	.description("Authenticate with Cyrus using auth key")
+	.description("Authenticate with Agitha using auth key")
 	.action(async (authKey: string) => {
 		const opts = program.opts();
 		const app = new Application(
-			opts.cyrusHome,
+			opts.agithaHome,
 			opts.envFile,
 			packageJson.version,
 			errorReporter,
@@ -89,7 +90,7 @@ program
 	.action(async () => {
 		const opts = program.opts();
 		const app = new Application(
-			opts.cyrusHome,
+			opts.agithaHome,
 			opts.envFile,
 			packageJson.version,
 			errorReporter,
@@ -104,7 +105,7 @@ program
 	.action(async () => {
 		const opts = program.opts();
 		const app = new Application(
-			opts.cyrusHome,
+			opts.agithaHome,
 			opts.envFile,
 			packageJson.version,
 			errorReporter,
@@ -119,7 +120,7 @@ program
 	.action(async () => {
 		const opts = program.opts();
 		const app = new Application(
-			opts.cyrusHome,
+			opts.agithaHome,
 			opts.envFile,
 			packageJson.version,
 			errorReporter,
@@ -149,7 +150,7 @@ program
 		) => {
 			const opts = program.opts();
 			const app = new Application(
-				opts.cyrusHome,
+				opts.agithaHome,
 				opts.envFile,
 				packageJson.version,
 			);
@@ -177,24 +178,62 @@ program
 })();
 
 /**
+ * Backward-compat for the Cyrus → Agitha rename: copy any `CYRUS_*` env var
+ * into the matching `AGITHA_*` slot if the new name isn't already set.
+ * Runs once at boot before any other env-reading code. Users with existing
+ * `~/.cyrus/.env` files or system-wide `CYRUS_*` exports keep working
+ * without touching their environment.
+ */
+function foldLegacyCyrusEnvVars(): void {
+	for (const [key, value] of Object.entries(process.env)) {
+		if (!key.startsWith("CYRUS_")) continue;
+		const renamed = `AGITHA_${key.slice("CYRUS_".length)}`;
+		if (process.env[renamed] === undefined && value !== undefined) {
+			process.env[renamed] = value;
+		}
+	}
+}
+
+/**
  * Best-effort env preload so the error reporter can read its config before the
  * full {@link Application} bootstrap. We honour `--env-file` only as a literal
  * argv lookup (Commander hasn't parsed yet) and otherwise fall back to the
- * default `<cyrus-home>/.env` path.
+ * default `<agitha-home>/.env` path.
  */
 function preloadEnvForBootstrap(): void {
 	const argv = process.argv.slice(2);
 	const flagIdx = argv.indexOf("--env-file");
-	const cyrusHomeIdx = argv.indexOf("--cyrus-home");
+	const agithaHomeIdx = argv.indexOf("--agitha-home");
 
 	const envFile = flagIdx >= 0 ? argv[flagIdx + 1] : undefined;
-	const cyrusHome =
-		cyrusHomeIdx >= 0 && argv[cyrusHomeIdx + 1]
-			? (argv[cyrusHomeIdx + 1] as string)
-			: resolve(homedir(), ".cyrus");
+	const agithaHome =
+		agithaHomeIdx >= 0 && argv[agithaHomeIdx + 1]
+			? (argv[agithaHomeIdx + 1] as string)
+			: resolveDefaultAgithaHome();
 
-	const path = envFile ?? join(cyrusHome, ".env");
+	const path = envFile ?? join(agithaHome, ".env");
 	if (existsSync(path)) {
 		dotenv.config({ path, override: false });
+		// Re-fold after .env load so legacy CYRUS_* keys defined in the file
+		// (not the system env) also populate the new AGITHA_* names.
+		foldLegacyCyrusEnvVars();
 	}
+}
+
+/**
+ * Resolve the default Agitha home directory, preferring `~/.agitha` and
+ * falling back to the legacy `~/.cyrus` location when only that exists.
+ *
+ * Backward-compat for users migrating from the Cyrus fork: their existing
+ * config dir (`~/.cyrus/`) keeps working without manual intervention until
+ * they either rename it or set `--agitha-home` / `AGITHA_HOME`.
+ */
+function resolveDefaultAgithaHome(): string {
+	const home = homedir();
+	const agithaPath = resolve(home, ".agitha");
+	const legacyCyrusPath = resolve(home, ".cyrus");
+	if (!existsSync(agithaPath) && existsSync(legacyCyrusPath)) {
+		return legacyCyrusPath;
+	}
+	return agithaPath;
 }

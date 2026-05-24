@@ -7,8 +7,8 @@
 		"moduleResolution": "NodeNext",
 		"baseUrl": "../../",
 		"paths": {
-			"cyrus-core": ["packages/core/dist/index.d.ts"],
-			"cyrus-edge-worker": [
+			"agitha-core": ["packages/core/dist/index.d.ts"],
+			"agitha-edge-worker": [
 				"packages/edge-worker/dist/edge-worker/src/index.d.ts"
 			]
 		}

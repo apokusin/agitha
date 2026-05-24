@@ -10,26 +10,26 @@ import type {
 	SDKMessage,
 	SessionStore,
 	WarmQuery,
-} from "cyrus-claude-runner";
+} from "agitha-claude-runner";
 import {
 	buildBaseSessionEnv,
 	ClaudeRunner,
 	HttpSessionStore,
 	normalizeMcpHttpTransport,
-} from "cyrus-claude-runner";
-import { getCyrusAppUrl } from "cyrus-cloudflare-tunnel-client";
-import { CodexRunner } from "cyrus-codex-runner";
-import { ConfigUpdater } from "cyrus-config-updater";
+} from "agitha-claude-runner";
+import { getAgithaAppUrl } from "agitha-cloudflare-tunnel-client";
+import { CodexRunner } from "agitha-codex-runner";
+import { ConfigUpdater } from "agitha-config-updater";
 import type {
 	AgentActivityCreateInput,
 	AgentEvent,
 	AgentRunnerConfig,
 	AgentSessionCreatedWebhook,
 	AgentSessionPromptedWebhook,
+	AgithaAgentSession,
 	BaseBranchResolution,
 	ContentUpdateMessage,
 	CustomPersonalityConfig,
-	CyrusAgentSession,
 	EdgeWorkerConfig,
 	GuidanceRule,
 	IAgentRunner,
@@ -51,7 +51,7 @@ import type {
 	Webhook,
 	WebhookAgentSession,
 	WebhookIssue,
-} from "cyrus-core";
+} from "agitha-core";
 import {
 	CLIIssueTrackerService,
 	CLIRPCServer,
@@ -77,9 +77,9 @@ import {
 	requireLinearWorkspaceId,
 	resolvePath,
 	WebhookIpValidator,
-} from "cyrus-core";
-import { CursorRunner } from "cyrus-cursor-runner";
-import { GeminiRunner } from "cyrus-gemini-runner";
+} from "agitha-core";
+import { CursorRunner } from "agitha-cursor-runner";
+import { GeminiRunner } from "agitha-gemini-runner";
 import {
 	extractCommentAuthor,
 	extractCommentBody,
@@ -104,8 +104,8 @@ import {
 	isPullRequestReviewCommentPayload,
 	isPullRequestReviewPayload,
 	stripMention,
-} from "cyrus-github-event-transport";
-import type { GitLabWebhookEvent } from "cyrus-gitlab-event-transport";
+} from "agitha-github-event-transport";
+import type { GitLabWebhookEvent } from "agitha-gitlab-event-transport";
 import {
 	extractDiscussionId,
 	extractSessionKey as extractGitLabSessionKey,
@@ -123,23 +123,23 @@ import {
 	GitLabEventTransport,
 	isNoteOnMergeRequest,
 	stripMention as stripGitLabMention,
-} from "cyrus-gitlab-event-transport";
+} from "agitha-gitlab-event-transport";
 import {
 	LinearEventTransport,
 	LinearIssueTrackerService,
 	type LinearOAuthConfig,
-} from "cyrus-linear-event-transport";
+} from "agitha-linear-event-transport";
 import {
-	type CyrusToolsOptions,
-	createCyrusToolsServer,
+	type AgithaToolsOptions,
+	createAgithaToolsServer,
 	createFetchFailureModesClient,
 	type FailureModesHttpClient,
 	type ResolvedSession,
-} from "cyrus-mcp-tools";
+} from "agitha-mcp-tools";
 import {
 	SlackEventTransport,
 	type SlackWebhookEvent,
-} from "cyrus-slack-event-transport";
+} from "agitha-slack-event-transport";
 import { Sessions, streamableHttp } from "fastify-mcp";
 import { ActivityPoster } from "./ActivityPoster.js";
 import { AgentSessionManager } from "./AgentSessionManager.js";
@@ -194,7 +194,7 @@ export declare interface EdgeWorker {
 	): boolean;
 }
 
-type CyrusToolsMcpContext = {
+type AgithaToolsMcpContext = {
 	contextId?: string;
 };
 
@@ -226,7 +226,7 @@ export class EdgeWorker extends EventEmitter {
 	private configUpdater: ConfigUpdater | null = null; // Single config updater for configuration updates
 	private persistenceManager: PersistenceManager;
 	private sharedApplicationServer: SharedApplicationServer;
-	private cyrusHome: string;
+	private agithaHome: string;
 	private globalSessionRegistry: GlobalSessionRegistry; // Centralized session storage across all repositories
 	private configPath?: string; // Path to config.json file
 	/** @internal - Exposed for testing only */
@@ -249,25 +249,25 @@ export class EdgeWorker extends EventEmitter {
 	private promptBuilder: PromptBuilder;
 	private defaultSkillsDeployer: DefaultSkillsDeployer;
 	private skillsPluginResolver: SkillsPluginResolver;
-	private readonly cyrusToolsMcpEndpoint = "/mcp/cyrus-tools";
-	private cyrusToolsMcpRegistered = false;
-	private cyrusToolsMcpRequestContext =
-		new AsyncLocalStorage<CyrusToolsMcpContext>();
-	private cyrusToolsMcpSessions = new Sessions<any>();
+	private readonly agithaToolsMcpEndpoint = "/mcp/agitha-tools";
+	private agithaToolsMcpRegistered = false;
+	private agithaToolsMcpRequestContext =
+		new AsyncLocalStorage<AgithaToolsMcpContext>();
+	private agithaToolsMcpSessions = new Sessions<any>();
 	/** Validates webhook source IPs against known provider allowlists */
 	private webhookIpValidator: WebhookIpValidator;
 	/** Egress proxy for sandbox network traffic filtering and header injection */
 	private egressProxy: EgressProxy | null = null;
 	/** Base SDK sandbox settings to pass to ClaudeRunner sessions (set when proxy starts) */
 	private sdkSandboxSettings:
-		| import("cyrus-claude-runner").SandboxSettings
+		| import("agitha-claude-runner").SandboxSettings
 		| null = null;
 	/** CA cert path for MITM TLS termination (passed per-session env, not process.env) */
 	private egressCaCertPath: string | null = null;
 	/**
-	 * Remote SessionStore that mirrors Claude SDK transcripts to the Cyrus
-	 * hosted control plane. Enabled when all three of `CYRUS_APP_URL`,
-	 * `CYRUS_API_KEY`, and `CYRUS_TEAM_ID` are set — used by any Claude
+	 * Remote SessionStore that mirrors Claude SDK transcripts to the Agitha
+	 * hosted control plane. Enabled when all three of `AGITHA_APP_URL`,
+	 * `AGITHA_API_KEY`, and `AGITHA_TEAM_ID` are set — used by any Claude
 	 * runner spawned from this worker so transcripts survive ephemeral
 	 * worktrees and are resumable from any host.
 	 */
@@ -303,7 +303,7 @@ export class EdgeWorker extends EventEmitter {
 	 * passed verbatim to `fs.readFileSync` (which does not expand tildes).
 	 * Repository-scoped paths are normalized separately in addNew /
 	 * updateModified; this covers the platform-level MCP config lists that
-	 * cyrus-hosted writes with literal `~/.cyrus/...` prefixes when
+	 * agitha-hosted writes with literal `~/.agitha/...` prefixes when
 	 * generating self-host config.
 	 */
 	private static normalizeConfigPaths(
@@ -343,24 +343,24 @@ export class EdgeWorker extends EventEmitter {
 	constructor(config: EdgeWorkerConfig) {
 		super();
 		this.config = EdgeWorker.normalizeConfigPaths(config);
-		this.cyrusHome = config.cyrusHome;
+		this.agithaHome = config.agithaHome;
 		this.logger = createLogger({ component: "EdgeWorker" });
 		this.persistenceManager = new PersistenceManager(
-			join(this.cyrusHome, "state"),
+			join(this.agithaHome, "state"),
 		);
 
 		// Mirror Claude SDK session transcripts to the hosted control plane
-		// when CYRUS_API_KEY (proof of team ownership) and CYRUS_TEAM_ID
+		// when AGITHA_API_KEY (proof of team ownership) and AGITHA_TEAM_ID
 		// (which team the transcripts belong to) are configured. The
-		// destination URL defaults to DEFAULT_CYRUS_APP_URL but can be
-		// overridden via CYRUS_APP_URL for preview environments. If either
+		// destination URL defaults to DEFAULT_AGITHA_APP_URL but can be
+		// overridden via AGITHA_APP_URL for preview environments. If either
 		// of the required vars is missing the store stays null and the SDK
 		// falls back to local JSONL only. Operators can also opt out
-		// explicitly by setting CYRUS_DISABLE_REMOTE_SESSION_STORE=1, which
+		// explicitly by setting AGITHA_DISABLE_REMOTE_SESSION_STORE=1, which
 		// keeps transcripts local even when the vars above are present.
-		const sessionStoreBaseUrl = getCyrusAppUrl();
-		const sessionStoreApiKey = process.env.CYRUS_API_KEY;
-		const sessionStoreTeamId = process.env.CYRUS_TEAM_ID;
+		const sessionStoreBaseUrl = getAgithaAppUrl();
+		const sessionStoreApiKey = process.env.AGITHA_API_KEY;
+		const sessionStoreTeamId = process.env.AGITHA_TEAM_ID;
 		const sessionStoreDisabled = this.isRemoteSessionStoreDisabled();
 		if (!sessionStoreDisabled && sessionStoreApiKey && sessionStoreTeamId) {
 			this.claudeSessionStore = new HttpSessionStore({
@@ -378,7 +378,7 @@ export class EdgeWorker extends EventEmitter {
 			sessionStoreTeamId
 		) {
 			this.logger.info(
-				"[SessionStore] Remote session store disabled via CYRUS_DISABLE_REMOTE_SESSION_STORE; transcripts will stay local.",
+				"[SessionStore] Remote session store disabled via AGITHA_DISABLE_REMOTE_SESSION_STORE; transcripts will stay local.",
 			);
 		}
 
@@ -389,7 +389,7 @@ export class EdgeWorker extends EventEmitter {
 		// For Self-Managed GitLab the API base URL must be derived from the
 		// configured repos' gitlabUrl host; otherwise the service falls back to
 		// gitlab.com and 404s on every reply. Picks the first configured
-		// GitLab repo's host (single GitLab host per Cyrus instance).
+		// GitLab repo's host (single GitLab host per Agitha instance).
 		const firstGitlabRepo = config.repositories.find((r) => r.gitlabUrl);
 		let gitlabApiBaseUrl: string | undefined;
 		if (firstGitlabRepo?.gitlabUrl) {
@@ -446,7 +446,7 @@ export class EdgeWorker extends EventEmitter {
 			},
 		};
 		this.repositoryRouter = new RepositoryRouter(repositoryRouterDeps);
-		this.gitService = new GitService({ cyrusHome: this.cyrusHome });
+		this.gitService = new GitService({ agithaHome: this.agithaHome });
 
 		// Initialize AskUserQuestion handler for elicitation via Linear select signal
 		this.askUserQuestionHandler = new AskUserQuestionHandler({
@@ -456,10 +456,10 @@ export class EdgeWorker extends EventEmitter {
 		});
 
 		// Initialize webhook IP validator
-		// Enabled by default in self-hosted mode (CYRUS_HOST_EXTERNAL=true),
+		// Enabled by default in self-hosted mode (AGITHA_HOST_EXTERNAL=true),
 		// can be overridden with WEBHOOK_IP_VALIDATION=false to disable
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 		const ipValidationEnv =
 			process.env.WEBHOOK_IP_VALIDATION?.toLowerCase().trim();
 		const ipValidationEnabled =
@@ -570,7 +570,7 @@ export class EdgeWorker extends EventEmitter {
 		// Initialize user access control with global and per-repository configs
 		const repoAccessConfigs = new Map<
 			string,
-			import("cyrus-core").UserAccessControlConfig | undefined
+			import("agitha-core").UserAccessControlConfig | undefined
 		>();
 		for (const repo of config.repositories) {
 			if (repo.isActive !== false) {
@@ -585,7 +585,7 @@ export class EdgeWorker extends EventEmitter {
 		// Initialize extracted service modules
 		this.attachmentService = new AttachmentService(
 			this.logger,
-			this.cyrusHome,
+			this.agithaHome,
 			this.config.linearWorkspaces || {},
 		);
 		this.runnerSelectionService = new RunnerSelectionService(this.config);
@@ -602,9 +602,9 @@ export class EdgeWorker extends EventEmitter {
 							getClient?: () => import("@linear/sdk").LinearClient;
 					  })
 					| undefined,
-			getCyrusToolsMcpUrl: () => this.getCyrusToolsMcpUrl(),
-			createCyrusToolsOptions: (parentSessionId) =>
-				this.createCyrusToolsOptions(parentSessionId),
+			getAgithaToolsMcpUrl: () => this.getAgithaToolsMcpUrl(),
+			createAgithaToolsOptions: (parentSessionId) =>
+				this.createAgithaToolsOptions(parentSessionId),
 		});
 		this.runnerConfigBuilder = new RunnerConfigBuilder(
 			this.toolPermissionResolver,
@@ -632,11 +632,11 @@ export class EdgeWorker extends EventEmitter {
 			getWorkspaceCustomPersonalities: () => this.config.customPersonalities,
 		});
 		this.defaultSkillsDeployer = new DefaultSkillsDeployer(
-			this.cyrusHome,
+			this.agithaHome,
 			this.logger,
 		);
 		this.skillsPluginResolver = new SkillsPluginResolver(
-			this.cyrusHome,
+			this.agithaHome,
 			this.logger,
 		);
 
@@ -647,7 +647,7 @@ export class EdgeWorker extends EventEmitter {
 	 * Start the edge worker
 	 */
 	async start(): Promise<void> {
-		// Deploy default skills to cyrusHome if not already present (one-time setup)
+		// Deploy default skills to agithaHome if not already present (one-time setup)
 		await this.defaultSkillsDeployer.ensureDeployed();
 
 		// Scaffold user skills plugin manifest if needed (one-time setup)
@@ -658,7 +658,7 @@ export class EdgeWorker extends EventEmitter {
 
 		// Pre-warm the 30 most recent Claude sessions in the background
 		// so their first query after restart has near-zero cold-start latency.
-		// Disabled by default; opt in with CYRUS_ENABLE_WARM_SESSIONS=1.
+		// Disabled by default; opt in with AGITHA_ENABLE_WARM_SESSIONS=1.
 		if (this.isWarmSessionsEnabled()) {
 			this.warmupRecentSessions(30).catch((err) => {
 				this.logger.warn("Session warmup failed (non-fatal):", err);
@@ -690,7 +690,7 @@ export class EdgeWorker extends EventEmitter {
 			this.logger.info("🛡️  Sandbox egress proxy: starting...");
 			this.egressProxy = new EgressProxy(
 				this.config.sandbox,
-				this.cyrusHome,
+				this.agithaHome,
 				this.logger,
 			);
 			await this.egressProxy.start();
@@ -810,7 +810,7 @@ export class EdgeWorker extends EventEmitter {
 			// Get appropriate secret based on mode
 			const secret = useDirectWebhooks
 				? process.env.LINEAR_WEBHOOK_SECRET || ""
-				: process.env.CYRUS_API_KEY || "";
+				: process.env.AGITHA_API_KEY || "";
 
 			this.linearEventTransport = new LinearEventTransport({
 				fastifyServer: this.sharedApplicationServer.getFastifyInstance(),
@@ -859,8 +859,8 @@ export class EdgeWorker extends EventEmitter {
 		// 3. Create and register ConfigUpdater (both platforms)
 		this.configUpdater = new ConfigUpdater(
 			this.sharedApplicationServer.getFastifyInstance(),
-			this.cyrusHome,
-			() => process.env.CYRUS_API_KEY || "",
+			this.agithaHome,
+			() => process.env.AGITHA_API_KEY || "",
 		);
 
 		// Register config update routes
@@ -868,14 +868,14 @@ export class EdgeWorker extends EventEmitter {
 
 		this.logger.info("✅ Config updater registered");
 		this.logger.info(
-			"   Routes: /api/update/cyrus-config, /api/update/cyrus-env,",
+			"   Routes: /api/update/agitha-config, /api/update/agitha-env,",
 		);
 		this.logger.info(
 			"           /api/update/repository, /api/update/test-mcp, /api/update/configure-mcp",
 		);
 
-		// 3. Register MCP endpoint for cyrus-tools on the same Fastify server/port
-		await this.registerCyrusToolsMcpEndpoint();
+		// 3. Register MCP endpoint for agitha-tools on the same Fastify server/port
+		await this.registerAgithaToolsMcpEndpoint();
 		// 4. Register /status endpoint for process activity monitoring
 		this.registerStatusEndpoint();
 
@@ -908,7 +908,7 @@ export class EdgeWorker extends EventEmitter {
 
 		fastify.get("/version", async (_request, reply) => {
 			return reply.status(200).send({
-				cyrus_cli_version: this.config.version ?? null,
+				agitha_cli_version: this.config.version ?? null,
 			});
 		});
 
@@ -918,16 +918,16 @@ export class EdgeWorker extends EventEmitter {
 
 	/**
 	 * Register the GitHub event transport for receiving forwarded GitHub webhooks from CYHOST.
-	 * This creates a /github-webhook endpoint that handles @cyrusagent mentions on GitHub PRs.
+	 * This creates a /github-webhook endpoint that handles @agithaagent mentions on GitHub PRs.
 	 */
 	private registerGitHubEventTransport(): void {
 		// Use direct GitHub signature verification only when BOTH:
 		// 1. GITHUB_WEBHOOK_SECRET is set (we have the secret to verify)
-		// 2. CYRUS_HOST_EXTERNAL is true (self-hosted: GitHub sends directly to us)
+		// 2. AGITHA_HOST_EXTERNAL is true (self-hosted: GitHub sends directly to us)
 		// On cloud droplets, CYHOST forwards webhooks with Bearer token auth
 		// (it verifies the GitHub signature itself and doesn't forward the headers).
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 		const hasGithubWebhookSecret =
 			process.env.GITHUB_WEBHOOK_SECRET != null &&
 			process.env.GITHUB_WEBHOOK_SECRET !== "";
@@ -935,7 +935,7 @@ export class EdgeWorker extends EventEmitter {
 		const verificationMode = useSignatureVerification ? "signature" : "proxy";
 		const secret = useSignatureVerification
 			? process.env.GITHUB_WEBHOOK_SECRET!
-			: process.env.CYRUS_API_KEY || "";
+			: process.env.AGITHA_API_KEY || "";
 
 		this.gitHubEventTransport = new GitHubEventTransport({
 			fastifyServer: this.sharedApplicationServer.getFastifyInstance(),
@@ -988,7 +988,7 @@ export class EdgeWorker extends EventEmitter {
 		const appId = process.env.GITHUB_APP_ID;
 		const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
 		if (appId && installationId) {
-			const pemPath = join(this.cyrusHome, "github-app.pem");
+			const pemPath = join(this.agithaHome, "github-app.pem");
 			this.gitHubAppTokenProvider = new GitHubAppTokenProvider({
 				appId,
 				installationId,
@@ -1011,7 +1011,7 @@ export class EdgeWorker extends EventEmitter {
 	 */
 	private registerGitLabEventTransport(): void {
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 		const hasGitlabWebhookSecret =
 			process.env.GITLAB_WEBHOOK_SECRET != null &&
 			process.env.GITLAB_WEBHOOK_SECRET !== "";
@@ -1019,7 +1019,7 @@ export class EdgeWorker extends EventEmitter {
 		const verificationMode = useSignatureVerification ? "signature" : "proxy";
 		const secret = useSignatureVerification
 			? process.env.GITLAB_WEBHOOK_SECRET!
-			: process.env.CYRUS_API_KEY || "";
+			: process.env.AGITHA_API_KEY || "";
 
 		this.gitLabEventTransport = new GitLabEventTransport({
 			fastifyServer: this.sharedApplicationServer.getFastifyInstance(),
@@ -1087,7 +1087,7 @@ export class EdgeWorker extends EventEmitter {
 		this.chatSessionHandler = new ChatSessionHandler(
 			slackAdapter,
 			{
-				cyrusHome: this.cyrusHome,
+				agithaHome: this.agithaHome,
 				chatRepositoryProvider,
 				runnerConfigBuilder: this.runnerConfigBuilder,
 				createRunner: (config) => {
@@ -1115,11 +1115,11 @@ export class EdgeWorker extends EventEmitter {
 
 		// Use direct Slack signature verification only when BOTH:
 		// 1. SLACK_SIGNING_SECRET is set (we have the secret to verify)
-		// 2. CYRUS_HOST_EXTERNAL is true (self-hosted: Slack sends directly to us)
+		// 2. AGITHA_HOST_EXTERNAL is true (self-hosted: Slack sends directly to us)
 		// On cloud droplets, CYHOST forwards webhooks with Bearer token auth
 		// (it verifies the Slack signature itself and doesn't forward the headers).
 		const isExternalHost =
-			process.env.CYRUS_HOST_EXTERNAL?.toLowerCase().trim() === "true";
+			process.env.AGITHA_HOST_EXTERNAL?.toLowerCase().trim() === "true";
 		const hasSlackSigningSecret =
 			process.env.SLACK_SIGNING_SECRET != null &&
 			process.env.SLACK_SIGNING_SECRET !== "";
@@ -1128,7 +1128,7 @@ export class EdgeWorker extends EventEmitter {
 		const slackVerificationMode = useDirectSlackWebhooks ? "direct" : "proxy";
 		const slackSecret = useDirectSlackWebhooks
 			? process.env.SLACK_SIGNING_SECRET!
-			: process.env.CYRUS_API_KEY || "";
+			: process.env.AGITHA_API_KEY || "";
 
 		this.slackEventTransport = new SlackEventTransport({
 			fastifyServer: this.sharedApplicationServer.getFastifyInstance(),
@@ -1318,7 +1318,7 @@ export class EdgeWorker extends EventEmitter {
 
 			// For pull_request_review, the review body IS the task context (no mention to strip)
 			// For other events, strip the bot mention to get the task instructions
-			const mentionHandle = botUsername ? `@${botUsername}` : "@cyrusagent";
+			const mentionHandle = botUsername ? `@${botUsername}` : "@agithaagent";
 			const taskInstructions = isPullRequestReview
 				? commentBody ||
 					"A reviewer has requested changes on this PR. Read the review comments to understand what needs to be changed."
@@ -1387,7 +1387,7 @@ export class EdgeWorker extends EventEmitter {
 
 			// Create an internal agent session (no Linear session for GitHub)
 			const githubSessionId = `github-${event.deliveryId}`;
-			agentSessionManager.createCyrusAgentSession(
+			agentSessionManager.createAgithaAgentSession(
 				githubSessionId,
 				sessionKey,
 				issueMinimal,
@@ -1985,7 +1985,7 @@ ${taskSection}`;
 			}
 
 			// Strip the bot mention to get the task instructions
-			const mentionHandle = botUsername ? `@${botUsername}` : "@cyrusagent";
+			const mentionHandle = botUsername ? `@${botUsername}` : "@agithaagent";
 			const taskInstructions = stripGitLabMention(noteBody, mentionHandle);
 
 			// Check for an existing multi-repo session that includes this repository
@@ -2053,7 +2053,7 @@ ${taskSection}`;
 
 			// Create an internal agent session (no Linear session for GitLab)
 			const gitlabSessionId = `gitlab-${Date.now()}`;
-			agentSessionManager.createCyrusAgentSession(
+			agentSessionManager.createAgithaAgentSession(
 				gitlabSessionId,
 				sessionKey,
 				issueMinimal,
@@ -2414,7 +2414,7 @@ ${taskSection}`;
 	}
 
 	/**
-	 * Compute the current status of the Cyrus process
+	 * Compute the current status of the Agitha process
 	 * @returns "idle" if the process can be safely restarted, "busy" if work is in progress
 	 */
 	private computeStatus(): "idle" | "busy" {
@@ -2545,8 +2545,8 @@ ${taskSection}`;
 		this.linearEventTransport = null;
 		this.configUpdater = null;
 		this.mcpConfigService.clearAllContexts();
-		this.cyrusToolsMcpSessions.removeAllListeners();
-		this.cyrusToolsMcpRegistered = false;
+		this.agithaToolsMcpSessions.removeAllListeners();
+		this.agithaToolsMcpRegistered = false;
 
 		// Stop egress proxy
 		if (this.egressProxy) {
@@ -2590,7 +2590,7 @@ ${taskSection}`;
 			this.logger.info("🛡️  Sandbox egress proxy: starting (config change)...");
 			this.egressProxy = new EgressProxy(
 				newConfig.sandbox!,
-				this.cyrusHome,
+				this.agithaHome,
 				this.logger,
 			);
 			await this.egressProxy.start();
@@ -2666,7 +2666,7 @@ ${taskSection}`;
 					"🛡️  CA certificate is NOT trusted system-wide. To trust (requires sudo):",
 				);
 				this.logger.warn(
-					`🛡️  sudo cp ${certPath} /usr/local/share/ca-certificates/cyrus-egress-ca.crt && sudo update-ca-certificates`,
+					`🛡️  sudo cp ${certPath} /usr/local/share/ca-certificates/agitha-egress-ca.crt && sudo update-ca-certificates`,
 				);
 			}
 			if (systemWideCert) {
@@ -2678,14 +2678,14 @@ ${taskSection}`;
 	}
 
 	/**
-	 * Check whether the Cyrus egress proxy CA is trusted at the OS level.
+	 * Check whether the Agitha egress proxy CA is trusted at the OS level.
 	 * macOS: searches the System keychain. Linux: checks update-ca-certificates output.
 	 */
 	private isCertTrustedSystemWide(): boolean {
 		try {
 			if (process.platform === "darwin") {
 				execSync(
-					'security find-certificate -c "Cyrus Egress Proxy CA" /Library/Keychains/System.keychain',
+					'security find-certificate -c "Agitha Egress Proxy CA" /Library/Keychains/System.keychain',
 					{ stdio: "ignore" },
 				);
 				return true;
@@ -2693,7 +2693,7 @@ ${taskSection}`;
 			if (process.platform === "linux") {
 				// Check if our cert exists in the system CA certificates directory
 				execSync(
-					"test -f /usr/local/share/ca-certificates/cyrus-egress-ca.crt",
+					"test -f /usr/local/share/ca-certificates/agitha-egress-ca.crt",
 					{ stdio: "ignore" },
 				);
 				return true;
@@ -3018,7 +3018,7 @@ ${taskSection}`;
 										agentSessionId: session.externalSessionId,
 										content: {
 											type: "response",
-											body: `**Repository Removed from Configuration**\n\nThis repository (\`${repo.name}\`) has been removed from the Cyrus configuration. All active sessions for this repository have been stopped.\n\nIf you need to continue working on this issue, please contact your administrator to restore the repository configuration.`,
+											body: `**Repository Removed from Configuration**\n\nThis repository (\`${repo.name}\`) has been removed from the Agitha configuration. All active sessions for this repository have been stopped.\n\nIf you need to continue working on this issue, please contact your administrator to restore the repository configuration.`,
 										},
 									},
 									"repository removal",
@@ -3098,7 +3098,7 @@ ${taskSection}`;
 		});
 
 		// Log verbose webhook info if enabled
-		if (process.env.CYRUS_WEBHOOK_DEBUG === "true") {
+		if (process.env.AGITHA_WEBHOOK_DEBUG === "true") {
 			this.logger.debug(
 				`Full webhook payload:`,
 				JSON.stringify(webhook, null, 2),
@@ -3136,7 +3136,7 @@ ${taskSection}`;
 				// Handle issue state changes — wake up parked sessions when blocking issues complete
 				await this.handleIssueStateChange(webhook);
 			} else {
-				if (process.env.CYRUS_WEBHOOK_DEBUG === "true") {
+				if (process.env.AGITHA_WEBHOOK_DEBUG === "true") {
 					this.logger.debug(
 						`Unhandled webhook type: ${(webhook as any).action}`,
 					);
@@ -3176,7 +3176,7 @@ ${taskSection}`;
 		// TODO: When legacy handlers are removed, restore activeWebhookCount tracking here.
 
 		// Log verbose message info if enabled
-		if (process.env.CYRUS_WEBHOOK_DEBUG === "true") {
+		if (process.env.AGITHA_WEBHOOK_DEBUG === "true") {
 			this.logger.debug(
 				`Internal message received: ${message.source}/${message.action}`,
 				JSON.stringify(message, null, 2),
@@ -3200,7 +3200,7 @@ ${taskSection}`;
 			} else {
 				// This branch should never be reached due to exhaustive type checking
 				// If it is reached, log the unexpected message for debugging
-				if (process.env.CYRUS_WEBHOOK_DEBUG === "true") {
+				if (process.env.AGITHA_WEBHOOK_DEBUG === "true") {
 					const unexpectedMessage = message as InternalMessage;
 					this.logger.debug(
 						`Unhandled message action: ${unexpectedMessage.action}`,
@@ -3432,7 +3432,7 @@ ${taskSection}`;
 	): Promise<void> {
 		// Check if issue update trigger is enabled (defaults to true if not set)
 		if (this.config.issueUpdateTrigger === false) {
-			if (process.env.CYRUS_WEBHOOK_DEBUG === "true") {
+			if (process.env.AGITHA_WEBHOOK_DEBUG === "true") {
 				this.logger.debug(
 					"Issue update trigger is disabled, skipping issue content update",
 				);
@@ -3510,7 +3510,7 @@ ${taskSection}`;
 		// Find session(s) for this issue
 		const sessions = this.agentSessionManager.getSessionsByIssueId(issueId);
 		if (sessions.length === 0) {
-			if (process.env.CYRUS_WEBHOOK_DEBUG === "true") {
+			if (process.env.AGITHA_WEBHOOK_DEBUG === "true") {
 				this.logger.debug(
 					`No sessions found for issue ${issueIdentifier} to receive update`,
 				);
@@ -3528,7 +3528,7 @@ ${taskSection}`;
 			}
 			const workspaceFolderName = basename(firstSession.workspace.path);
 			const attachmentsDir = join(
-				this.cyrusHome,
+				this.agithaHome,
 				workspaceFolderName,
 				"attachments",
 			);
@@ -3941,7 +3941,7 @@ ${taskSection}`;
 	}
 
 	/**
-	 * Create a new Cyrus agent session with all necessary setup
+	 * Create a new Agitha agent session with all necessary setup
 	 * @param sessionId The Linear agent activity session ID
 	 * @param issue Linear issue object
 	 * @param repositories Repository configurations (primary repo is repositories[0])
@@ -3949,7 +3949,7 @@ ${taskSection}`;
 	 * @param linearWorkspaceId Linear workspace ID (from webhook.organizationId)
 	 * @returns Object containing session details and setup information
 	 */
-	private async createCyrusAgentSession(
+	private async createAgithaAgentSession(
 		sessionId: string,
 		issue: { id: string; identifier: string },
 		repositoriesOrSingle: RepositoryConfig | RepositoryConfig[],
@@ -3981,7 +3981,7 @@ ${taskSection}`;
 		// When adding new options here, always update the handler signature in config-types.ts
 		// AND the CLI's handler implementation in WorkerService.ts to pass them through.
 		this.logger.info(
-			`createCyrusAgentSession: passing baseBranchOverrides=${baseBranchOverrides ? `Map(size=${baseBranchOverrides.size}, keys=[${Array.from(baseBranchOverrides.keys()).join(",")}])` : "undefined"}, useCustomHandler=${!!this.config.handlers?.createWorkspace}`,
+			`createAgithaAgentSession: passing baseBranchOverrides=${baseBranchOverrides ? `Map(size=${baseBranchOverrides.size}, keys=[${Array.from(baseBranchOverrides.keys()).join(",")}])` : "undefined"}, useCustomHandler=${!!this.config.handlers?.createWorkspace}`,
 		);
 		const workspace = this.config.handlers?.createWorkspace
 			? await this.config.handlers.createWorkspace(fullIssue, repositories, {
@@ -4005,7 +4005,7 @@ ${taskSection}`;
 				workspace.resolvedBaseBranches?.[repo.id]?.branch ?? repo.baseBranch,
 		}));
 
-		agentSessionManager.createCyrusAgentSession(
+		agentSessionManager.createAgithaAgentSession(
 			sessionId,
 			issue.id,
 			issueMinimal,
@@ -4063,7 +4063,7 @@ ${taskSection}`;
 		// Pre-create attachments directory even if no attachments exist yet
 		const workspaceFolderName = basename(workspace.path);
 		const attachmentsDir = join(
-			this.cyrusHome,
+			this.agithaHome,
 			workspaceFolderName,
 			"attachments",
 		);
@@ -4071,7 +4071,7 @@ ${taskSection}`;
 
 		// Write Claude settings to disable co-authored-by attribution in the workspace.
 		// This uses the SDK's "local" settings source (loaded via settingSources: ["user", "project", "local"])
-		// to ensure Cyrus sessions don't add "Co-Authored-By: Claude" trailers to git commits.
+		// to ensure Agitha sessions don't add "Co-Authored-By: Claude" trailers to git commits.
 		const claudeSettingsDir = join(workspace.path, ".claude");
 		await mkdir(claudeSettingsDir, { recursive: true });
 		await writeFile(
@@ -4153,7 +4153,7 @@ ${taskSection}`;
 				);
 
 			if (routingResult.type === "none") {
-				if (process.env.CYRUS_WEBHOOK_DEBUG === "true") {
+				if (process.env.AGITHA_WEBHOOK_DEBUG === "true") {
 					this.logger.info(
 						`No repository configured for webhook from workspace ${webhook.organizationId}`,
 					);
@@ -4340,7 +4340,7 @@ ${taskSection}`;
 		await this.postInstantAcknowledgment(sessionId, linearWorkspaceId);
 
 		// Create the session using the shared method (pass full repositories array)
-		const sessionData = await this.createCyrusAgentSession(
+		const sessionData = await this.createAgithaAgentSession(
 			sessionId,
 			issue,
 			repositories,
@@ -4770,7 +4770,7 @@ ${taskSection}`;
 			);
 
 			// Create the session using the shared method with all repositories
-			const sessionData = await this.createCyrusAgentSession(
+			const sessionData = await this.createAgithaAgentSession(
 				sessionId,
 				issue,
 				repositories,
@@ -4849,7 +4849,7 @@ ${taskSection}`;
 		// Always set up attachments directory, even if no attachments in current comment
 		const workspaceFolderName = basename(session.workspace.path);
 		const attachmentsDir = join(
-			this.cyrusHome,
+			this.agithaHome,
 			workspaceFolderName,
 			"attachments",
 		);
@@ -5059,7 +5059,7 @@ ${taskSection}`;
 				// All recovery attempts failed - post visible feedback
 				await this.agentSessionManager.createResponseActivity(
 					agentSessionId,
-					"I couldn't process your message because the session configuration was lost. Please create a new session by mentioning me (@cyrus) in a new comment with your prompt.",
+					"I couldn't process your message because the session configuration was lost. Please create a new session by mentioning me (@agitha) in a new comment with your prompt.",
 				);
 				this.logger.warn(
 					`Failed to recover repository for prompted webhook ${agentSessionId} - all fallback methods exhausted`,
@@ -5161,7 +5161,7 @@ ${taskSection}`;
 	 *
 	 * Skill scopes (persisted in `scope.json` sidecars by the config-updater)
 	 * match against:
-	 * - the active repository's Cyrus config ID,
+	 * - the active repository's Agitha config ID,
 	 * - the Linear team that owns the issue, and
 	 * - the Linear label IDs attached to the issue.
 	 */
@@ -5515,8 +5515,8 @@ ${taskSection}`;
 		return this.attachmentService.generateNewAttachmentManifest(result);
 	}
 
-	private async registerCyrusToolsMcpEndpoint(): Promise<void> {
-		if (this.cyrusToolsMcpRegistered) {
+	private async registerAgithaToolsMcpEndpoint(): Promise<void> {
+		if (this.agithaToolsMcpRegistered) {
 			return;
 		}
 
@@ -5526,7 +5526,7 @@ ${taskSection}`;
 			typeof fastify.addHook !== "function"
 		) {
 			console.warn(
-				"[EdgeWorker] Skipping cyrus-tools MCP endpoint registration: Fastify instance does not support register/addHook",
+				"[EdgeWorker] Skipping agitha-tools MCP endpoint registration: Fastify instance does not support register/addHook",
 			);
 			return;
 		}
@@ -5540,7 +5540,7 @@ ${taskSection}`;
 						: "";
 			const requestPath = rawUrl.split("?")[0];
 
-			if (requestPath !== this.cyrusToolsMcpEndpoint) {
+			if (requestPath !== this.agithaToolsMcpEndpoint) {
 				done();
 				return;
 			}
@@ -5551,63 +5551,63 @@ ${taskSection}`;
 				)
 			) {
 				_reply.code(401).send({
-					error: "Unauthorized cyrus-tools MCP request",
+					error: "Unauthorized agitha-tools MCP request",
 				});
 				done();
 				return;
 			}
 
-			const rawContextHeader = request.headers?.["x-cyrus-mcp-context-id"];
+			const rawContextHeader = request.headers?.["x-agitha-mcp-context-id"];
 			const contextId = Array.isArray(rawContextHeader)
 				? rawContextHeader[0]
 				: rawContextHeader;
 
-			this.cyrusToolsMcpRequestContext.run({ contextId }, () => {
+			this.agithaToolsMcpRequestContext.run({ contextId }, () => {
 				done();
 			});
 		});
 
-		this.cyrusToolsMcpSessions.on("connected", (sessionId) => {
+		this.agithaToolsMcpSessions.on("connected", (sessionId) => {
 			console.log(
-				`[EdgeWorker] cyrus-tools MCP session connected: ${sessionId}`,
+				`[EdgeWorker] agitha-tools MCP session connected: ${sessionId}`,
 			);
 		});
 
-		this.cyrusToolsMcpSessions.on("terminated", (sessionId) => {
+		this.agithaToolsMcpSessions.on("terminated", (sessionId) => {
 			console.log(
-				`[EdgeWorker] cyrus-tools MCP session terminated: ${sessionId}`,
+				`[EdgeWorker] agitha-tools MCP session terminated: ${sessionId}`,
 			);
 		});
 
-		this.cyrusToolsMcpSessions.on("error", (error) => {
-			console.error("[EdgeWorker] cyrus-tools MCP session error:", error);
+		this.agithaToolsMcpSessions.on("error", (error) => {
+			console.error("[EdgeWorker] agitha-tools MCP session error:", error);
 		});
 
 		await fastify.register(streamableHttp, {
 			stateful: true,
-			mcpEndpoint: this.cyrusToolsMcpEndpoint,
-			sessions: this.cyrusToolsMcpSessions,
+			mcpEndpoint: this.agithaToolsMcpEndpoint,
+			sessions: this.agithaToolsMcpSessions,
 			createServer: async () => {
 				const contextId =
-					this.cyrusToolsMcpRequestContext.getStore()?.contextId;
+					this.agithaToolsMcpRequestContext.getStore()?.contextId;
 				if (!contextId) {
 					throw new Error(
-						"Missing x-cyrus-mcp-context-id header for cyrus-tools MCP request",
+						"Missing x-agitha-mcp-context-id header for agitha-tools MCP request",
 					);
 				}
 
 				const context = this.mcpConfigService.getContext(contextId);
 				if (!context) {
 					throw new Error(
-						`Unknown cyrus-tools MCP context '${contextId}'. Build MCP config before connecting.`,
+						`Unknown agitha-tools MCP context '${contextId}'. Build MCP config before connecting.`,
 					);
 				}
 
 				const sdkServer =
 					context.prebuiltServer ||
-					createCyrusToolsServer(
+					createAgithaToolsServer(
 						context.linearClient,
-						this.createCyrusToolsOptions(context.parentSessionId),
+						this.createAgithaToolsOptions(context.parentSessionId),
 					);
 				this.mcpConfigService.clearPrebuiltServer(contextId);
 
@@ -5615,9 +5615,9 @@ ${taskSection}`;
 			},
 		});
 
-		this.cyrusToolsMcpRegistered = true;
+		this.agithaToolsMcpRegistered = true;
 		console.log(
-			`✅ Cyrus tools MCP endpoint registered at ${this.cyrusToolsMcpEndpoint}`,
+			`✅ Agitha tools MCP endpoint registered at ${this.agithaToolsMcpEndpoint}`,
 		);
 	}
 
@@ -5625,19 +5625,19 @@ ${taskSection}`;
 
 	/**
 	 * Lazily build the HTTP client used by `log_failure_mode` to POST to
-	 * cyrus-hosted. Uses `CYRUS_APP_URL` (the same env var the remote
+	 * agitha-hosted. Uses `AGITHA_APP_URL` (the same env var the remote
 	 * session-store client reads, see top of this file) so preview
 	 * environments and prod share a single way to point at a control
-	 * plane. Returns null when either the URL or the `CYRUS_API_KEY` are
+	 * plane. Returns null when either the URL or the `AGITHA_API_KEY` are
 	 * missing — in that mode the tool is simply not registered, so
 	 * customer-mode CLI users without a control plane don't see a broken
 	 * tool.
 	 */
 	private getFailureModesClient(): FailureModesHttpClient | null {
 		if (this.failureModesClient) return this.failureModesClient;
-		const apiKey = process.env.CYRUS_API_KEY?.trim();
+		const apiKey = process.env.AGITHA_API_KEY?.trim();
 		if (!apiKey) return null;
-		const baseUrl = getCyrusAppUrl();
+		const baseUrl = getAgithaAppUrl();
 		this.failureModesClient = createFetchFailureModesClient({
 			baseUrl,
 			apiKey,
@@ -5653,7 +5653,7 @@ ${taskSection}`;
 	 */
 	/**
 	 * Resolve a working-directory string to the rich session bundle a
-	 * Cyrus team member needs to triage a failure-mode report: the
+	 * Agitha team member needs to triage a failure-mode report: the
 	 * internal session id (for dedup), the runner session id + runner
 	 * type (so triage can pull the Claude/Gemini/Codex/Cursor transcript),
 	 * the Linear AgentSession + source-issue identifiers (so triage can
@@ -5673,7 +5673,7 @@ ${taskSection}`;
 	 * single responsibility (SRP: this method's only job is "where do
 	 * sessions live?", separate from "how do we match one by cwd?").
 	 */
-	private getAllKnownSessions(): CyrusAgentSession[] {
+	private getAllKnownSessions(): AgithaAgentSession[] {
 		return [
 			...this.agentSessionManager.getAllSessions(),
 			...(this.chatSessionHandler?.getAllChatSessions() ?? []),
@@ -5751,9 +5751,11 @@ ${taskSection}`;
 		};
 	}
 
-	private createCyrusToolsOptions(parentSessionId?: string): CyrusToolsOptions {
+	private createAgithaToolsOptions(
+		parentSessionId?: string,
+	): AgithaToolsOptions {
 		const failureModesClient = this.getFailureModesClient();
-		const options: CyrusToolsOptions = {
+		const options: AgithaToolsOptions = {
 			parentSessionId,
 			onSessionCreated: (childSessionId: string, parentId: string) => {
 				this.handleChildSessionMapping(childSessionId, parentId);
@@ -5913,7 +5915,7 @@ ${taskSection}`;
 		return true;
 	}
 
-	private getCyrusToolsMcpUrl(): string {
+	private getAgithaToolsMcpUrl(): string {
 		const server = this.sharedApplicationServer as {
 			getPort?: () => number;
 		};
@@ -5921,7 +5923,7 @@ ${taskSection}`;
 			typeof server.getPort === "function"
 				? server.getPort()
 				: this.config.serverPort || this.config.webhookPort || 3456;
-		return `http://127.0.0.1:${port}${this.cyrusToolsMcpEndpoint}`;
+		return `http://127.0.0.1:${port}${this.agithaToolsMcpEndpoint}`;
 	}
 
 	/**
@@ -5937,7 +5939,7 @@ ${taskSection}`;
 	 */
 	private async buildSessionPrompt(
 		isNewSession: boolean,
-		session: CyrusAgentSession,
+		session: AgithaAgentSession,
 		fullIssue: Issue,
 		repository: RepositoryConfig,
 		promptBody: string,
@@ -6290,7 +6292,7 @@ ${input.userComment}
 	 * @returns Object containing the runner config and runner type to use
 	 */
 	private async buildAgentRunnerConfig(
-		session: CyrusAgentSession,
+		session: AgithaAgentSession,
 		repository: RepositoryConfig,
 		sessionId: string,
 		systemPrompt: string | undefined,
@@ -6359,7 +6361,7 @@ ${input.userComment}
 					? this.config.linearMcpConfigs
 					: this.config.githubMcpConfigs,
 			linearWorkspaceId,
-			cyrusHome: this.cyrusHome,
+			agithaHome: this.agithaHome,
 			logger: log,
 			plugins,
 			skills: allowedSkillNames,
@@ -6569,10 +6571,10 @@ ${input.userComment}
 	 * Warm sessions are an opt-in optimization that pre-spawns Claude Code
 	 * subprocesses on startup so the first query after a restart skips the
 	 * cold-start cost. Disabled by default; opt in by setting
-	 * `CYRUS_ENABLE_WARM_SESSIONS=1` (or `=true`).
+	 * `AGITHA_ENABLE_WARM_SESSIONS=1` (or `=true`).
 	 */
 	private isWarmSessionsEnabled(): boolean {
-		const raw = process.env.CYRUS_ENABLE_WARM_SESSIONS;
+		const raw = process.env.AGITHA_ENABLE_WARM_SESSIONS;
 		if (!raw) return false;
 		const v = raw.toLowerCase().trim();
 		return v === "1" || v === "true";
@@ -6581,14 +6583,14 @@ ${input.userComment}
 	/**
 	 * Whether the remote Claude session store is explicitly disabled.
 	 *
-	 * The remote store mirrors SDK transcripts to the Cyrus hosted control
-	 * plane and is on by default whenever `CYRUS_APP_URL`, `CYRUS_API_KEY`,
-	 * and `CYRUS_TEAM_ID` are all set. Operators can opt out — without
+	 * The remote store mirrors SDK transcripts to the Agitha hosted control
+	 * plane and is on by default whenever `AGITHA_APP_URL`, `AGITHA_API_KEY`,
+	 * and `AGITHA_TEAM_ID` are all set. Operators can opt out — without
 	 * unsetting those vars (which other features depend on) — by setting
-	 * `CYRUS_DISABLE_REMOTE_SESSION_STORE=1` (or `=true`).
+	 * `AGITHA_DISABLE_REMOTE_SESSION_STORE=1` (or `=true`).
 	 */
 	private isRemoteSessionStoreDisabled(): boolean {
-		const raw = process.env.CYRUS_DISABLE_REMOTE_SESSION_STORE;
+		const raw = process.env.AGITHA_DISABLE_REMOTE_SESSION_STORE;
 		if (!raw) return false;
 		const v = raw.toLowerCase().trim();
 		return v === "1" || v === "true";
@@ -6899,7 +6901,7 @@ ${input.userComment}
 	 * 1. Check if runner is actively streaming
 	 * 2. Add to stream if streaming, OR resume session if not
 	 *
-	 * @param session The Cyrus agent session
+	 * @param session The Agitha agent session
 	 * @param repository Repository configuration
 	 * @param sessionId Linear agent activity session ID
 	 * @param agentSessionManager Agent session manager instance
@@ -6911,7 +6913,7 @@ ${input.userComment}
 	 * @returns true if message was added to stream, false if session was resumed
 	 */
 	private async handlePromptWithStreamingCheck(
-		session: CyrusAgentSession,
+		session: AgithaAgentSession,
 		repository: RepositoryConfig,
 		sessionId: string,
 		agentSessionManager: AgentSessionManager,
@@ -6990,7 +6992,7 @@ ${input.userComment}
 	/**
 	 * Resume or create an Agent session with the given prompt
 	 * This is the core logic for handling prompted agent activities
-	 * @param session The Cyrus agent session
+	 * @param session The Agitha agent session
 	 * @param repository The repository configuration
 	 * @param sessionId The Linear agent session ID
 	 * @param agentSessionManager The agent session manager
@@ -6999,7 +7001,7 @@ ${input.userComment}
 	 * @param isNewSession Whether this is a new session
 	 */
 	async resumeAgentSession(
-		session: CyrusAgentSession,
+		session: AgithaAgentSession,
 		repository: RepositoryConfig,
 		sessionId: string,
 		agentSessionManager: AgentSessionManager,
@@ -7097,7 +7099,7 @@ ${input.userComment}
 		// Set up attachments directory
 		const workspaceFolderName = basename(session.workspace.path);
 		const attachmentsDir = join(
-			this.cyrusHome,
+			this.agithaHome,
 			workspaceFolderName,
 			"attachments",
 		);

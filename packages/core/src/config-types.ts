@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { Workspace } from "./CyrusAgentSession.js";
+import type { Workspace } from "./AgithaAgentSession.js";
 // Import types for use in this file
 import type { EdgeConfig, RepositoryConfig } from "./config-schemas.js";
 import type { Issue } from "./issue-tracker/types.js";
@@ -40,7 +40,7 @@ export { TRUSTED_DOMAINS } from "./trusted-domains.js";
  * Resolve path with tilde (~) expansion
  * Expands ~ to the user's home directory and resolves to absolute path
  *
- * @param path - Path that may contain ~ prefix (e.g., "~/.cyrus/repos/myrepo")
+ * @param path - Path that may contain ~ prefix (e.g., "~/.agitha/repos/myrepo")
  * @returns Absolute path with ~ expanded
  *
  * @example
@@ -72,11 +72,11 @@ export type OAuthCallbackHandler = (
  * be persisted to config.json.
  */
 export interface EdgeWorkerRuntimeConfig {
-	/** Cyrus CLI version (e.g., "1.2.3"), used in /version endpoint */
+	/** Agitha CLI version (e.g., "1.2.3"), used in /version endpoint */
 	version?: string;
 
-	/** Cyrus home directory - required at runtime */
-	cyrusHome: string;
+	/** Agitha home directory - required at runtime */
+	agithaHome: string;
 
 	// --- Server/Network Configuration (runtime-specific) ---
 
@@ -109,7 +109,7 @@ export interface EdgeWorkerRuntimeConfig {
 
 	// --- Agent Configuration (for CLI mode) ---
 
-	/** The name/handle the agent responds to (e.g., "john", "cyrus") */
+	/** The name/handle the agent responds to (e.g., "john", "agitha") */
 	agentHandle?: string;
 
 	/** The user ID of the agent (for CLI mode) */
@@ -162,7 +162,7 @@ export interface EdgeWorkerRuntimeConfig {
  * Configuration for the EdgeWorker supporting multiple repositories.
  *
  * This is the complete runtime configuration that combines:
- * - EdgeConfig: Serializable settings from ~/.cyrus/config.json
+ * - EdgeConfig: Serializable settings from ~/.agitha/config.json
  * - EdgeWorkerRuntimeConfig: Runtime-only fields (callbacks, handlers, server config)
  *
  * The separation exists because EdgeConfig can be persisted to disk as JSON,
@@ -176,7 +176,7 @@ export interface EdgeWorkerRuntimeConfig {
  * // EdgeWorkerConfig adds runtime handlers
  * const runtimeConfig: EdgeWorkerConfig = {
  *   ...fileConfig,
- *   cyrusHome: '/home/user/.cyrus',
+ *   agithaHome: '/home/user/.agitha',
  *   handlers: {
  *     onSessionStart: (issueId, issue, repoId) => console.log('Started'),
  *     onError: (error) => console.error(error),

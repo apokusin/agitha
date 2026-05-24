@@ -25,15 +25,15 @@ export const UserIdentifierSchema = z.union([
 export const UserAccessControlConfigSchema = z.object({
 	/**
 	 * Users allowed to delegate issues.
-	 * If specified, ONLY these users can trigger Cyrus sessions.
-	 * Empty array means no one is allowed (effectively disables Cyrus).
+	 * If specified, ONLY these users can trigger Agitha sessions.
+	 * Empty array means no one is allowed (effectively disables Agitha).
 	 * Omitting this field means everyone is allowed (unless blocked).
 	 */
 	allowedUsers: z.array(UserIdentifierSchema).optional(),
 
 	/**
 	 * Users blocked from delegating issues.
-	 * These users cannot trigger Cyrus sessions.
+	 * These users cannot trigger Agitha sessions.
 	 * Takes precedence over allowedUsers.
 	 */
 	blockedUsers: z.array(UserIdentifierSchema).optional(),
@@ -392,7 +392,7 @@ export const RepositoryConfigSchema = z.object({
 });
 
 /**
- * Edge configuration - the serializable configuration stored in ~/.cyrus/config.json
+ * Edge configuration - the serializable configuration stored in ~/.agitha/config.json
  *
  * This schema defines all settings that can be persisted to disk.
  * It contains global settings that apply across all repositories,
@@ -479,7 +479,7 @@ export const EdgeConfigSchema = z.object({
 	/**
 	 * Allowed tools for Slack @mention chat sessions. When set, overrides the
 	 * built-in read-only chat tool set used by ToolPermissionResolver. The
-	 * workspace MCP tool prefixes (mcp__linear, mcp__cyrus-tools, etc.) are
+	 * workspace MCP tool prefixes (mcp__linear, mcp__agitha-tools, etc.) are
 	 * still appended automatically.
 	 */
 	slackAllowedTools: z.array(z.string()).optional(),
@@ -498,9 +498,9 @@ export const EdgeConfigSchema = z.object({
 	 * `repository.mcpConfigPath` is not consulted here — only this list
 	 * determines which custom `.mcp.json` files load for Slack. When
 	 * omitted/empty, no custom files load (native MCP servers — Linear,
-	 * Cyrus tools, Slack MCP, Cyrus docs — still run as usual).
+	 * Agitha tools, Slack MCP, Agitha docs — still run as usual).
 	 *
-	 * The per-platform lists let cyrus-hosted route custom MCP server
+	 * The per-platform lists let agitha-hosted route custom MCP server
 	 * availability per surface — e.g. expose `slack-mcp-server` only on
 	 * Slack, or scope a Supabase MCP to GitHub PR sessions but not Linear
 	 * issue work. Each entry is passed as-is to Claude Code's

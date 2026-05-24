@@ -3,7 +3,7 @@ import type {
 	EdgeWorkerConfig,
 	ILogger,
 	RepositoryConfig,
-} from "cyrus-core";
+} from "agitha-core";
 import { describe, expect, it } from "vitest";
 import { ToolPermissionResolver } from "../src/ToolPermissionResolver.js";
 
@@ -30,7 +30,7 @@ function makeConfig(
 ): EdgeWorkerConfig {
 	return {
 		repositories: [],
-		cyrusHome: "/tmp/cyrus",
+		agithaHome: "/tmp/agitha",
 		...overrides,
 	} as EdgeWorkerConfig;
 }

@@ -9,15 +9,15 @@ import type {
 	SDKMessage,
 	SdkPluginConfig,
 	StopHookInput,
-} from "cyrus-claude-runner";
+} from "agitha-claude-runner";
 import type {
 	AgentRunnerConfig,
-	CyrusAgentSession,
+	AgithaAgentSession,
 	ILogger,
 	OnAskUserQuestion,
 	RepositoryConfig,
 	RunnerType,
-} from "cyrus-core";
+} from "agitha-core";
 import { buildIntentToAddHook } from "./hooks/IntentToAddHook.js";
 import { buildPrMarkerHook } from "./hooks/PrMarkerHook.js";
 import { appendFailureModeAddendum } from "./prompts/failureModePromptAddendum.js";
@@ -71,12 +71,12 @@ export interface ChatRunnerConfigInput {
 	systemPrompt: string;
 	sessionId: string;
 	resumeSessionId?: string;
-	cyrusHome: string;
+	agithaHome: string;
 	/** Chat platform name (e.g. "slack") — used to namespace the shared auto-memory dir */
 	platformName: string;
 	/** Linear workspace ID for building fresh MCP config at session start */
 	linearWorkspaceId?: string;
-	/** Repository whose MCP runtime servers (Linear MCP, Cyrus tools, etc.) get
+	/** Repository whose MCP runtime servers (Linear MCP, Agitha tools, etc.) get
 	 * spun up for this chat session — chat sessions are repo-agnostic at the
 	 * session level, so this just picks one repo to seed those native servers. */
 	repository?: RepositoryConfig;
@@ -101,7 +101,7 @@ export interface ChatRunnerConfigInput {
  * Input for building an issue session runner config.
  */
 export interface IssueRunnerConfigInput {
-	session: CyrusAgentSession;
+	session: AgithaAgentSession;
 	repository: RepositoryConfig;
 	sessionId: string;
 	systemPrompt: string | undefined;
@@ -124,7 +124,7 @@ export interface IssueRunnerConfigInput {
 	 */
 	platformMcpConfigOverrides?: readonly string[];
 	linearWorkspaceId?: string;
-	cyrusHome: string;
+	agithaHome: string;
 	logger: ILogger;
 	/**
 	 * Optional model override from a matched custom personality. Takes
@@ -229,10 +229,10 @@ export class RunnerConfigBuilder {
 		input.logger.debug("Chat session allowed tools:", allowedTools);
 
 		// Shared auto-memory across all chat threads on this platform. Lives
-		// under cyrusHome (not the per-thread workspace) so memory built up in
+		// under agithaHome (not the per-thread workspace) so memory built up in
 		// one Slack thread is available to every other Slack thread.
 		const autoMemoryDirectory = join(
-			input.cyrusHome,
+			input.agithaHome,
 			`${input.platformName}-memory`,
 		);
 
@@ -246,7 +246,7 @@ export class RunnerConfigBuilder {
 				...repositoryPaths,
 			],
 			workspaceName: input.workspaceName,
-			cyrusHome: input.cyrusHome,
+			agithaHome: input.agithaHome,
 			autoMemoryDirectory,
 			appendSystemPrompt: appendFailureModeAddendum(input.systemPrompt),
 			...(mcpConfig ? { mcpConfig } : {}),
@@ -376,7 +376,7 @@ export class RunnerConfigBuilder {
 			disallowedTools: input.disallowedTools,
 			allowedDirectories: input.allowedDirectories,
 			workspaceName: input.session.issue?.identifier || input.session.issueId,
-			cyrusHome: input.cyrusHome,
+			agithaHome: input.agithaHome,
 			mcpConfigPath,
 			mcpConfig,
 			appendSystemPrompt: appendFailureModeAddendum(input.systemPrompt),
@@ -617,7 +617,7 @@ export function buildStopHook(
  *
  * Uses `--untracked-files=no` so that pre-existing untracked files in the
  * customer's worktree (scratch files, local env files, IDE artifacts) do not
- * wedge the session. Files Cyrus creates via Write/Edit are marked with
+ * wedge the session. Files Agitha creates via Write/Edit are marked with
  * `git add --intent-to-add` by `IntentToAddHook` so they still show as a
  * tracked diff and block the stop when left uncommitted.
  */

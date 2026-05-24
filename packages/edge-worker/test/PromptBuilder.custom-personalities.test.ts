@@ -6,7 +6,7 @@ import type {
 	IIssueTrackerService,
 	ILogger,
 	RepositoryConfig,
-} from "cyrus-core";
+} from "agitha-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitService } from "../src/GitService.js";
 import { PromptBuilder } from "../src/PromptBuilder.js";
@@ -69,7 +69,7 @@ describe("PromptBuilder custom personalities", () => {
 	beforeEach(async () => {
 		tmpDir = join(
 			tmpdir(),
-			`cyrus-personality-test-${Date.now()}-${Math.random()
+			`agitha-personality-test-${Date.now()}-${Math.random()
 				.toString(36)
 				.slice(2)}`,
 		);

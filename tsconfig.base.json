@@ -20,19 +20,19 @@
 		"noUncheckedIndexedAccess": true,
 		"baseUrl": ".",
 		"paths": {
-			"cyrus-core": ["packages/core"],
-			"cyrus-claude-parser": ["packages/claude-parser"],
-			"cyrus-linear-client": ["packages/linear-client"],
-			"cyrus-history-stream": ["packages/history-stream"],
-			"cyrus-edge-worker": ["packages/edge-worker"],
-			"cyrus-claude-runner": ["packages/claude-runner"],
-			"cyrus-codex-runner": ["packages/codex-runner"],
-			"cyrus-cursor-runner": ["packages/cursor-runner"],
-			"cyrus-gemini-runner": ["packages/gemini-runner"],
-			"cyrus-mcp-tools": ["packages/mcp-tools"],
-			"cyrus-simple-agent-runner": ["packages/simple-agent-runner"],
-			"cyrus-config-updater": ["packages/config-updater"],
-			"cyrus-linear-event-transport": ["packages/linear-event-transport"]
+			"agitha-core": ["packages/core"],
+			"agitha-claude-parser": ["packages/claude-parser"],
+			"agitha-linear-client": ["packages/linear-client"],
+			"agitha-history-stream": ["packages/history-stream"],
+			"agitha-edge-worker": ["packages/edge-worker"],
+			"agitha-claude-runner": ["packages/claude-runner"],
+			"agitha-codex-runner": ["packages/codex-runner"],
+			"agitha-cursor-runner": ["packages/cursor-runner"],
+			"agitha-gemini-runner": ["packages/gemini-runner"],
+			"agitha-mcp-tools": ["packages/mcp-tools"],
+			"agitha-simple-agent-runner": ["packages/simple-agent-runner"],
+			"agitha-config-updater": ["packages/config-updater"],
+			"agitha-linear-event-transport": ["packages/linear-event-transport"]
 		}
 	},
 	"exclude": ["node_modules", "dist", "build"]

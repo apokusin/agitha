@@ -49,8 +49,8 @@ import type {
 	Team,
 	User,
 	WorkflowState,
-} from "cyrus-core";
-import { createLogger, type ILogger } from "cyrus-core";
+} from "agitha-core";
+import { createLogger, type ILogger } from "agitha-core";
 import { LinearEventTransport } from "./LinearEventTransport.js";
 
 /**

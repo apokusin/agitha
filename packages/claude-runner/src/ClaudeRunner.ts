@@ -16,14 +16,14 @@ import {
 	type SDKMessage,
 	type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { AskUserQuestionInput } from "cyrus-core";
+import type { AskUserQuestionInput } from "agitha-core";
 import {
 	createLogger,
 	type IAgentRunner,
 	type ILogger,
 	LogLevel,
 	StreamingPrompt,
-} from "cyrus-core";
+} from "agitha-core";
 import dotenv from "dotenv";
 import { ClaudeMessageFormatter, type IMessageFormatter } from "./formatter.js";
 import { buildHomeDirectoryDisallowedTools } from "./home-directory-restrictions.js";
@@ -258,7 +258,7 @@ export class ClaudeRunner extends EventEmitter implements IAgentRunner {
 	private messages: SDKMessage[] = [];
 	private streamingPrompt: StreamingPrompt | null = null;
 	private activeQuery: Query | null = null;
-	private cyrusHome: string;
+	private agithaHome: string;
 	private formatter: IMessageFormatter;
 	private pendingResultMessage: SDKMessage | null = null;
 	private canUseToolCallback: CanUseTool | undefined;
@@ -270,7 +270,7 @@ export class ClaudeRunner extends EventEmitter implements IAgentRunner {
 		this.config = config;
 		this.keepSessionWarm = keepSessionWarm;
 		this.logger = config.logger ?? createLogger({ component: "ClaudeRunner" });
-		this.cyrusHome = config.cyrusHome;
+		this.agithaHome = config.agithaHome;
 		this.formatter = new ClaudeMessageFormatter();
 
 		// Create canUseTool callback if onAskUserQuestion is provided
@@ -902,7 +902,7 @@ export class ClaudeRunner extends EventEmitter implements IAgentRunner {
 		// If logging has already been set up and we now have versions, write the version file
 		if (this.logStream && versions) {
 			try {
-				const logsDir = join(this.cyrusHome, "logs");
+				const logsDir = join(this.agithaHome, "logs");
 				const workspaceName =
 					this.config.workspaceName ||
 					(this.config.workingDirectory
@@ -1113,7 +1113,7 @@ export class ClaudeRunner extends EventEmitter implements IAgentRunner {
 	}
 
 	/**
-	 * Set up logging to .cyrus directory
+	 * Set up logging to .agitha directory
 	 */
 	private setupLogging(): void {
 		try {
@@ -1127,8 +1127,8 @@ export class ClaudeRunner extends EventEmitter implements IAgentRunner {
 				this.readableLogStream = null;
 			}
 
-			// Create logs directory structure: <cyrusHome>/logs/<workspace-name>/
-			const logsDir = join(this.cyrusHome, "logs");
+			// Create logs directory structure: <agithaHome>/logs/<workspace-name>/
+			const logsDir = join(this.agithaHome, "logs");
 
 			// Get workspace name from config or extract from working directory
 			const workspaceName =

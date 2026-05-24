@@ -401,7 +401,7 @@ export interface IAgentRunner {
  *   mcpConfig: {
  *     'linear': { command: 'npx', args: ['-y', '@linear/mcp-server'] }
  *   },
- *   cyrusHome: '/home/user/.cyrus'
+ *   agithaHome: '/home/user/.agitha'
  * };
  * ```
  */
@@ -432,8 +432,8 @@ export interface AgentRunnerConfig {
 	maxTurns?: number;
 	/** Built-in tools available in model context (empty array disables all tools) */
 	tools?: string[];
-	/** Cyrus home directory (required) */
-	cyrusHome: string;
+	/** Agitha home directory (required) */
+	agithaHome: string;
 	/**
 	 * Custom directory path for Claude's auto-memory storage. Forwarded to the
 	 * Claude SDK as settings.autoMemoryDirectory. When unset, the SDK falls

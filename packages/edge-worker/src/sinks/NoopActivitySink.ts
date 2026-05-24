@@ -1,4 +1,4 @@
-import type { AgentActivityContent } from "cyrus-core";
+import type { AgentActivityContent } from "agitha-core";
 import type {
 	ActivityPostOptions,
 	ActivityPostResult,

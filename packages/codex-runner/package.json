@@ -1,7 +1,7 @@
 {
-	"name": "cyrus-codex-runner",
+	"name": "agitha-codex-runner",
 	"version": "0.2.57",
-	"description": "Codex CLI process wrapper for Cyrus",
+	"description": "Codex CLI process wrapper for Agitha",
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -17,8 +17,8 @@
 	},
 	"dependencies": {
 		"@openai/codex-sdk": "^0.125.0",
-		"cyrus-core": "workspace:*",
-		"cyrus-simple-agent-runner": "workspace:*"
+		"agitha-core": "workspace:*",
+		"agitha-simple-agent-runner": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",

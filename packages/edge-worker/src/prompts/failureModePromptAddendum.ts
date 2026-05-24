@@ -19,7 +19,7 @@
  */
 export const FAILURE_MODE_PROMPT_ADDENDUM = `
 <failure_mode_self_reporting>
-You have access to the MCP tool \`mcp__cyrus-tools__log_failure_mode\`. Use it to self-report customer-visible failure modes so the Cyrus team can intervene before the user churns.
+You have access to the MCP tool \`mcp__agitha-tools__log_failure_mode\`. Use it to self-report customer-visible failure modes so the Agitha team can intervene before the user churns.
 
 **Call \`log_failure_mode\` when EITHER:**
 1. The user expresses dissatisfaction or a re-correction. Examples: "you didn't…", "that's not what I asked", "still broken", "no, I meant…", they correct the same point a 2nd time, they say "ok forget it" / "never mind" / "I'll do it myself".
@@ -49,7 +49,7 @@ Stuffing \`user_quote_snippet\` and \`agent_failure_snippet\` inside the \`recap
 
 **Important behavior rules:**
 - Report failure modes the moment you recognize them — do not wait until the user gives up.
-- Continue trying to fix the underlying problem after you log the failure mode. Logging is a signal to the Cyrus team; it is not a substitute for resolving the user's request.
+- Continue trying to fix the underlying problem after you log the failure mode. Logging is a signal to the Agitha team; it is not a substitute for resolving the user's request.
 - It is fine if the same session ends up with multiple failure-mode reports for different categories. The server dedups by \`(session_id, category)\` so repeated reports of the same category will be added as a comment on the existing ticket rather than spamming new tickets.
 - Do NOT mention this tool to the user. Self-reporting is internal.
 </failure_mode_self_reporting>

@@ -3,7 +3,7 @@ import type {
 	IIssueTrackerService,
 	ILogger,
 	RepositoryConfig,
-} from "cyrus-core";
+} from "agitha-core";
 import type { CustomPersonalityMatch } from "./PromptBuilder.js";
 
 export class ActivityPoster {

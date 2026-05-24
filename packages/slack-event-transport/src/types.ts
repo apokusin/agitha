@@ -2,7 +2,7 @@
  * Types for Slack event transport
  */
 
-import type { InternalMessage } from "cyrus-core";
+import type { InternalMessage } from "agitha-core";
 import type { FastifyInstance } from "fastify";
 
 /**
@@ -20,7 +20,7 @@ export interface SlackEventTransportConfig {
 	fastifyServer: FastifyInstance;
 	/** Verification mode: 'proxy' (via CYHOST) or 'direct' (Slack signing secret) */
 	verificationMode: SlackVerificationMode;
-	/** Secret for verification (CYRUS_API_KEY for proxy, SLACK_SIGNING_SECRET for direct) */
+	/** Secret for verification (AGITHA_API_KEY for proxy, SLACK_SIGNING_SECRET for direct) */
 	secret: string;
 }
 

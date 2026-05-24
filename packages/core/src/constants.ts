@@ -1,13 +1,13 @@
 import { join } from "node:path";
 
 /**
- * Shared constants used across Cyrus packages
+ * Shared constants used across Agitha packages
  */
 
 /**
- * Default proxy URL for Cyrus hosted services
+ * Default proxy URL for Agitha hosted services
  */
-export const DEFAULT_PROXY_URL = "https://cyrus-proxy.ceedar.workers.dev";
+export const DEFAULT_PROXY_URL = "https://agitha-proxy.ceedar.workers.dev";
 
 /**
  * Default directory name for git worktrees
@@ -20,21 +20,21 @@ export const DEFAULT_WORKTREES_DIR = "worktrees";
 export const DEFAULT_REPOS_DIR = "repos";
 
 /**
- * Resolves the repos directory, preferring CYRUS_REPOS_DIR env var over the default.
+ * Resolves the repos directory, preferring AGITHA_REPOS_DIR env var over the default.
  */
-export function getDefaultReposDir(cyrusHome: string): string {
+export function getDefaultReposDir(agithaHome: string): string {
 	return (
-		process.env.CYRUS_REPOS_DIR?.trim() || join(cyrusHome, DEFAULT_REPOS_DIR)
+		process.env.AGITHA_REPOS_DIR?.trim() || join(agithaHome, DEFAULT_REPOS_DIR)
 	);
 }
 
 /**
- * Resolves the worktrees directory, preferring CYRUS_WORKTREES_DIR env var over the default.
+ * Resolves the worktrees directory, preferring AGITHA_WORKTREES_DIR env var over the default.
  */
-export function getDefaultWorktreesDir(cyrusHome: string): string {
+export function getDefaultWorktreesDir(agithaHome: string): string {
 	return (
-		process.env.CYRUS_WORKTREES_DIR?.trim() ||
-		join(cyrusHome, DEFAULT_WORKTREES_DIR)
+		process.env.AGITHA_WORKTREES_DIR?.trim() ||
+		join(agithaHome, DEFAULT_WORKTREES_DIR)
 	);
 }
 

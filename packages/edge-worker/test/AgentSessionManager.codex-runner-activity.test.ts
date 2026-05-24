@@ -1,4 +1,4 @@
-import { CodexRunner } from "cyrus-codex-runner";
+import { CodexRunner } from "agitha-codex-runner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSessionManager } from "../src/AgentSessionManager";
 import type { IActivitySink } from "../src/sinks/IActivitySink";
@@ -21,10 +21,10 @@ describe("AgentSessionManager - Codex tool activity mapping", () => {
 		postActivitySpy = vi.spyOn(mockActivitySink, "postActivity");
 		manager = new AgentSessionManager();
 		runner = new CodexRunner({
-			workingDirectory: "/Users/connor/code/cyrus",
+			workingDirectory: "/Users/connor/code/agitha",
 		});
 
-		manager.createCyrusAgentSession(
+		manager.createAgithaAgentSession(
 			sessionId,
 			issueId,
 			{
@@ -35,7 +35,7 @@ describe("AgentSessionManager - Codex tool activity mapping", () => {
 				branchName: "test-branch",
 			},
 			{
-				path: "/Users/connor/code/cyrus",
+				path: "/Users/connor/code/agitha",
 				isGitWorktree: false,
 			},
 		);
@@ -57,7 +57,7 @@ describe("AgentSessionManager - Codex tool activity mapping", () => {
 				type: "file_change",
 				changes: [
 					{
-						path: "/Users/connor/code/cyrus/packages/core/src/index.ts",
+						path: "/Users/connor/code/agitha/packages/core/src/index.ts",
 						kind: "update",
 					},
 				],

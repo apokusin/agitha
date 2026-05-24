@@ -1,8 +1,8 @@
-# Cyrus Configuration File
+# Agitha Configuration File
 
-Cyrus stores configuration in `~/.cyrus/config.json`. This file is created automatically during initial setup and can be edited manually to customize behavior.
+Agitha stores configuration in `~/.agitha/config.json`. This file is created automatically during initial setup and can be edited manually to customize behavior.
 
-Editing this manually only applies to those running the fully end-to-end self-hosted. Those who are paying for Cyrus, management of config.json is automated.
+Editing this manually only applies to those running the fully end-to-end self-hosted. Those who are paying for Agitha, management of config.json is automated.
 
 ---
 
@@ -52,7 +52,7 @@ Learn more about MCP: https://code.claude.com/docs/en/mcp
 
 ### `teamKeys` (array of strings)
 
-Routes Linear issues from specific teams to this repository. When specified, only issues from matching teams trigger Cyrus.
+Routes Linear issues from specific teams to this repository. When specified, only issues from matching teams trigger Agitha.
 
 Example: `["CEE", "FRONT", "BACK"]` - Only process issues from teams CEE, FRONT, and BACK
 
@@ -74,7 +74,7 @@ Example: `["backend", "api"]` - Only process issues that have the "backend" or "
 
 ## Routing Priority Order
 
-When multiple routing configurations are present, Cyrus evaluates them in the following priority order:
+When multiple routing configurations are present, Agitha evaluates them in the following priority order:
 
 1. **`routingLabels`** (highest priority) - Label-based routing
 2. **`projectKeys`** (medium priority) - Project-based routing
@@ -169,14 +169,14 @@ Can be configured at the workspace level (top-level `customPersonalities` in `co
   "customPersonalities": {
     "code-reviewer": {
       "labels": ["Code Review", "PR Review"],
-      "promptPath": "~/.cyrus/personalities/code-reviewer.md",
+      "promptPath": "~/.agitha/personalities/code-reviewer.md",
       "allowedTools": "readOnly",
       "model": "claude-opus-4-7",
       "description": "Read-only code review personality"
     },
     "security-auditor": {
       "labels": ["Security"],
-      "promptPath": "~/.cyrus/personalities/security-auditor.md",
+      "promptPath": "~/.agitha/personalities/security-auditor.md",
       "allowedTools": ["Read", "Glob", "Grep", "WebFetch"]
     }
   },
@@ -194,7 +194,7 @@ Can be configured at the workspace level (top-level `customPersonalities` in `co
       "customPersonalities": {
         "design-doc-writer": {
           "labels": ["Design Doc"],
-          "promptPath": "/abs/path/to/repo/.cyrus/personalities/design.md",
+          "promptPath": "/abs/path/to/repo/.agitha/personalities/design.md",
           "allowedTools": ["Read", "Glob", "Grep", "WebFetch", "mcp__linear"]
         }
       }
@@ -217,7 +217,7 @@ By default, granting a personality `"Write"` (or `"Edit"`) in `allowedTools` let
 ```json
 "copy-writer": {
   "labels": ["Article"],
-  "promptPath": "~/.cyrus/personalities/copy-writer.md",
+  "promptPath": "~/.agitha/personalities/copy-writer.md",
   "allowedTools": ["Read", "Glob", "Grep", "WebFetch", "Write"],
   "writeScopes": ["./content/**"]
 }
@@ -239,7 +239,7 @@ The tag takes precedence over label matching: if `copy-writer` is configured any
 
 ## User Access Control
 
-Control which Linear users can delegate issues to Cyrus. Supports both global configuration and per-repository overrides.
+Control which Linear users can delegate issues to Agitha. Supports both global configuration and per-repository overrides.
 
 ### `userAccessControl` (object)
 
@@ -385,9 +385,9 @@ When `networkPolicy.allow` is specified (or expanded from a preset), all domains
 
 ### CA Certificate Trust
 
-The egress proxy generates a CA certificate at `~/.cyrus/certs/cyrus-egress-ca.pem` for TLS interception of domains with transform rules. This cert is stable across restarts — once trusted, it stays trusted.
+The egress proxy generates a CA certificate at `~/.agitha/certs/agitha-egress-ca.pem` for TLS interception of domains with transform rules. This cert is stable across restarts — once trusted, it stays trusted.
 
-**Automatic (per-session, when `systemWideCert: false`):** Cyrus sets the following env vars automatically for every agent session:
+**Automatic (per-session, when `systemWideCert: false`):** Agitha sets the following env vars automatically for every agent session:
 
 | Env Var | Covers |
 |---------|--------|
@@ -401,7 +401,7 @@ The egress proxy generates a CA certificate at `~/.cyrus/certs/cyrus-egress-ca.p
 | `AWS_CA_BUNDLE` | AWS CLI, boto3 |
 | `DENO_CERT` | Deno |
 
-If `NODE_EXTRA_CA_CERTS` is already set in the host environment (e.g., corporate proxy), Cyrus merges both certs into a combined bundle.
+If `NODE_EXTRA_CA_CERTS` is already set in the host environment (e.g., corporate proxy), Agitha merges both certs into a combined bundle.
 
 **Not covered by env vars (require system-wide trust):**
 
@@ -415,10 +415,10 @@ For these tools, system-wide trust is required.
 
 ```bash
 # macOS
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.cyrus/certs/cyrus-egress-ca.pem
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.agitha/certs/agitha-egress-ca.pem
 
 # Linux
-sudo cp ~/.cyrus/certs/cyrus-egress-ca.pem /usr/local/share/ca-certificates/cyrus-egress-ca.crt
+sudo cp ~/.agitha/certs/agitha-egress-ca.pem /usr/local/share/ca-certificates/agitha-egress-ca.crt
 sudo update-ca-certificates
 ```
 
@@ -433,7 +433,7 @@ Then update config.json:
 }
 ```
 
-On startup, Cyrus checks whether the cert is trusted system-wide (macOS keychain or Linux CA certificates) and logs the result:
+On startup, Agitha checks whether the cert is trusted system-wide (macOS keychain or Linux CA certificates) and logs the result:
 
 ```
 🛡️  CA certificate is trusted system-wide ✓
@@ -444,7 +444,7 @@ or, if not yet trusted:
 
 ```
 [WARN] 🛡️  CA certificate is NOT trusted in the macOS System keychain. To trust (requires sudo):
-[WARN] 🛡️  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.cyrus/certs/cyrus-egress-ca.pem
+[WARN] 🛡️  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/.agitha/certs/agitha-egress-ca.pem
 ```
 
 ---
@@ -481,7 +481,7 @@ Path to a script that runs for all repositories when creating new worktrees. See
 
 ## Tool Configuration Priority
 
-When determining allowed tools, Cyrus follows this priority order:
+When determining allowed tools, Agitha follows this priority order:
 
 1. Repository-specific prompt configuration (`labelPrompts.debugger.allowedTools`)
 2. Global prompt defaults (`promptDefaults.debugger.allowedTools`)
@@ -544,4 +544,4 @@ Each repository configuration includes these required fields:
 - `isActive` - Whether the repository is active
 - `linearWorkspaceId` - Linear workspace UUID (references a key in `linearWorkspaces`)
 
-These fields are managed automatically during setup. For self-hosted instances, use the `cyrus self-auth-linear` and `cyrus self-add-repo` commands.
+These fields are managed automatically during setup. For self-hosted instances, use the `agitha self-auth-linear` and `agitha self-add-repo` commands.

@@ -1,9 +1,9 @@
-import { EdgeConfigPayloadSchema } from "cyrus-core";
+import { EdgeConfigPayloadSchema } from "agitha-core";
 import { z } from "zod";
 
 /**
  * Repository configuration payload
- * Matches the format sent by cyrus-hosted
+ * Matches the format sent by agitha-hosted
  */
 export interface RepositoryPayload {
 	repository_url: string; // Git clone URL
@@ -14,7 +14,7 @@ export interface RepositoryPayload {
 
 /**
  * Repository deletion payload
- * Sent by cyrus-hosted when removing a repository
+ * Sent by agitha-hosted when removing a repository
  */
 export interface DeleteRepositoryPayload {
 	repository_name: string; // Repository name to delete
@@ -22,25 +22,25 @@ export interface DeleteRepositoryPayload {
 }
 
 /**
- * Cyrus config update payload schema
+ * Agitha config update payload schema
  * Extends EdgeConfigPayloadSchema with operation flags for the update process.
  * Uses EdgeConfigPayloadSchema (not EdgeConfigSchema) because incoming payloads
  * may omit workspaceBaseDir - the handler applies a default value.
  */
-export const CyrusConfigPayloadSchema = EdgeConfigPayloadSchema.extend({
-	restartCyrus: z.boolean().optional(),
+export const AgithaConfigPayloadSchema = EdgeConfigPayloadSchema.extend({
+	restartAgitha: z.boolean().optional(),
 	backupConfig: z.boolean().optional(),
 });
 
-export type CyrusConfigPayload = z.infer<typeof CyrusConfigPayloadSchema>;
+export type AgithaConfigPayload = z.infer<typeof AgithaConfigPayloadSchema>;
 
 /**
- * Cyrus environment variables payload (for Claude token)
+ * Agitha environment variables payload (for Claude token)
  */
-export interface CyrusEnvPayload {
+export interface AgithaEnvPayload {
 	variables?: Record<string, string>;
 	ANTHROPIC_API_KEY?: string;
-	restartCyrus?: boolean;
+	restartAgitha?: boolean;
 	backupEnv?: boolean;
 	[key: string]: string | boolean | Record<string, string> | undefined;
 }
@@ -103,7 +103,7 @@ export interface CheckGlabData {
 }
 
 /**
- * Error response to send back to cyrus-hosted
+ * Error response to send back to agitha-hosted
  */
 export interface ErrorResponse {
 	success: false;
@@ -112,7 +112,7 @@ export interface ErrorResponse {
 }
 
 /**
- * Success response to send back to cyrus-hosted
+ * Success response to send back to agitha-hosted
  */
 export interface SuccessResponse {
 	success: true;
@@ -124,7 +124,7 @@ export type ApiResponse = SuccessResponse | ErrorResponse;
 
 /**
  * Create or update a user skill
- * Sent by cyrus-hosted when a user creates/edits a skill
+ * Sent by agitha-hosted when a user creates/edits a skill
  */
 export interface UpdateSkillPayload {
 	/** Skill name — used as the directory name and invocation name */
@@ -146,7 +146,7 @@ export interface UpdateSkillPayload {
 
 /**
  * Delete a user skill
- * Sent by cyrus-hosted when a user removes a skill
+ * Sent by agitha-hosted when a user removes a skill
  */
 export interface DeleteSkillPayload {
 	/** Skill name to delete */

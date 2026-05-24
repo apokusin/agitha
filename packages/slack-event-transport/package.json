@@ -1,5 +1,5 @@
 {
-	"name": "cyrus-slack-event-transport",
+	"name": "agitha-slack-event-transport",
 	"version": "0.2.57",
 	"description": "Slack event transport for receiving and verifying forwarded Slack webhooks",
 	"type": "module",
@@ -16,7 +16,7 @@
 		"test:run": "vitest run"
 	},
 	"dependencies": {
-		"cyrus-core": "workspace:*",
+		"agitha-core": "workspace:*",
 		"fastify": "^5.8.5"
 	},
 	"devDependencies": {

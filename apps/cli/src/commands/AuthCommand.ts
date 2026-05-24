@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getCyrusAppUrl } from "cyrus-cloudflare-tunnel-client";
+import { getAgithaAppUrl } from "agitha-cloudflare-tunnel-client";
 import { BaseCommand } from "./ICommand.js";
 
 /**
- * Auth command - authenticate with Cyrus Pro plan using auth key
+ * Auth command - authenticate with Agitha Pro plan using auth key
  */
 export class AuthCommand extends BaseCommand {
 	async execute(args: string[]): Promise<void> {
@@ -17,20 +17,20 @@ export class AuthCommand extends BaseCommand {
 			authKey.trim().length === 0
 		) {
 			this.logError("Error: Auth key is required");
-			console.log("\nUsage: cyrus auth <auth-key>");
+			console.log("\nUsage: agitha auth <auth-key>");
 			console.log(
-				`\nGet your auth key from: ${getCyrusAppUrl()}/onboarding/auth-cyrus`,
+				`\nGet your auth key from: ${getAgithaAppUrl()}/onboarding/auth-agitha`,
 			);
 			process.exit(1);
 		}
 
-		console.log("\n🔑 Authenticating with Cyrus...");
+		console.log("\n🔑 Authenticating with Agitha...");
 		this.logDivider();
 
 		try {
 			// Import ConfigApiClient
 			const { ConfigApiClient } = await import(
-				"cyrus-cloudflare-tunnel-client"
+				"agitha-cloudflare-tunnel-client"
 			);
 
 			// Call the config API to get credentials
@@ -42,35 +42,35 @@ export class AuthCommand extends BaseCommand {
 				console.error(configResponse.error || "Invalid response from server");
 				console.log("\nPlease verify your auth key is correct.");
 				console.log(
-					`Get your auth key from: ${getCyrusAppUrl()}/onboarding/auth-cyrus`,
+					`Get your auth key from: ${getAgithaAppUrl()}/onboarding/auth-agitha`,
 				);
 				process.exit(1);
 			}
 
 			this.logSuccess("Authentication successful!");
 
-			// Ensure CYRUS_HOME directory exists
-			if (!existsSync(this.app.cyrusHome)) {
-				mkdirSync(this.app.cyrusHome, { recursive: true });
+			// Ensure AGITHA_HOME directory exists
+			if (!existsSync(this.app.agithaHome)) {
+				mkdirSync(this.app.agithaHome, { recursive: true });
 			}
 
-			// Store tokens in ~/.cyrus/.env file
-			const envPath = resolve(this.app.cyrusHome, ".env");
-			const envContent = `# Cyrus Authentication Credentials
+			// Store tokens in ~/.agitha/.env file
+			const envPath = resolve(this.app.agithaHome, ".env");
+			const envContent = `# Agitha Authentication Credentials
 # Generated on ${new Date().toISOString()}
 CLOUDFLARE_TOKEN=${configResponse.config!.cloudflareToken}
-CYRUS_API_KEY=${configResponse.config!.apiKey}
-CYRUS_SETUP_PENDING=true
+AGITHA_API_KEY=${configResponse.config!.apiKey}
+AGITHA_SETUP_PENDING=true
 `;
 
 			writeFileSync(envPath, envContent, "utf-8");
 			this.logSuccess(`Credentials saved to ${envPath}`);
 
-			// Reload environment variables to pick up CYRUS_SETUP_PENDING
+			// Reload environment variables to pick up AGITHA_SETUP_PENDING
 			const dotenv = await import("dotenv");
 			dotenv.config({ path: envPath, override: true });
 
-			console.log("\n✨ Setup complete! Starting Cyrus...");
+			console.log("\n✨ Setup complete! Starting Agitha...");
 			this.logDivider();
 			console.log();
 

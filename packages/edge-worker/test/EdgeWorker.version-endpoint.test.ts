@@ -12,10 +12,10 @@ vi.mock("fs/promises", () => ({
 }));
 
 // Mock dependencies
-vi.mock("cyrus-claude-runner");
-vi.mock("cyrus-codex-runner");
-vi.mock("cyrus-gemini-runner");
-vi.mock("cyrus-linear-event-transport");
+vi.mock("agitha-claude-runner");
+vi.mock("agitha-codex-runner");
+vi.mock("agitha-gemini-runner");
+vi.mock("agitha-linear-event-transport");
 vi.mock("@linear/sdk");
 vi.mock("../src/SharedApplicationServer.js", () => ({
 	SharedApplicationServer: vi.fn().mockImplementation(() => ({
@@ -33,7 +33,7 @@ vi.mock("../src/AgentSessionManager.js", () => ({
 	AgentSessionManager: vi.fn().mockImplementation(() => ({
 		getAllAgentRunners: vi.fn().mockReturnValue([]),
 		getAllSessions: vi.fn().mockReturnValue([]),
-		createCyrusAgentSession: vi.fn(),
+		createAgithaAgentSession: vi.fn(),
 		getSession: vi.fn(),
 		getActiveSessionsByIssueId: vi.fn().mockReturnValue([]),
 		setActivitySink: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock("../src/AgentSessionManager.js", () => ({
 		emit: vi.fn(), // EventEmitter method
 	})),
 }));
-vi.mock("cyrus-core", async (importOriginal) => {
+vi.mock("agitha-core", async (importOriginal) => {
 	const actual = (await importOriginal()) as any;
 	return {
 		...actual,
@@ -89,7 +89,7 @@ describe("EdgeWorker - Version Endpoint", () => {
 
 		mockConfig = {
 			platform: "linear",
-			cyrusHome: "/test/.cyrus",
+			agithaHome: "/test/.agitha",
 			repositories: [mockRepository],
 			linearWorkspaces: {
 				"test-workspace": { linearToken: "test-token" },
@@ -185,7 +185,7 @@ describe("EdgeWorker - Version Endpoint", () => {
 
 			expect(mockReply.status).toHaveBeenCalledWith(200);
 			expect(mockReply.send).toHaveBeenCalledWith({
-				cyrus_cli_version: null,
+				agitha_cli_version: null,
 			});
 		});
 
@@ -237,7 +237,7 @@ describe("EdgeWorker - Version Endpoint", () => {
 
 			expect(mockReply.status).toHaveBeenCalledWith(200);
 			expect(mockReply.send).toHaveBeenCalledWith({
-				cyrus_cli_version: "1.2.3",
+				agitha_cli_version: "1.2.3",
 			});
 		});
 
@@ -291,7 +291,7 @@ describe("EdgeWorker - Version Endpoint", () => {
 			expect(mockReply.status).toHaveBeenCalledWith(200);
 			// Empty string is truthy for ?? operator, so it returns empty string
 			expect(mockReply.send).toHaveBeenCalledWith({
-				cyrus_cli_version: "",
+				agitha_cli_version: "",
 			});
 		});
 	});

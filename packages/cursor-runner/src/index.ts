@@ -1,8 +1,8 @@
 export { CursorRunner } from "./CursorRunner.js";
 export {
+	type AgithaPermissionsConfig,
+	buildAgithaPermissionsConfig,
 	buildAutoDenyPatterns,
-	buildCyrusPermissionsConfig,
-	type CyrusPermissionsConfig,
 } from "./permissions.js";
 export { SimpleCursorRunner } from "./SimpleCursorRunner.js";
 export {
